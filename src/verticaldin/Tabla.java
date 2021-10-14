@@ -1,0 +1,162 @@
+package verticaldin;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ *
+ * @author pipe
+ */
+public class Tabla {
+    private String tipoFragment;
+    private boolean CBIR=false;
+    private String nombre;
+    private int umbralOP;
+    private int umbralCO;
+    private String atributoMultimedia;
+    private String atributoMultimediaTamanio;
+    private String atributoLlave;
+    private ArrayList<Atributo> Atributos;
+    private String idTabla; //mi tabla que se llama tabla, no la remota
+    
+
+    /**
+     * @return the nombre
+     */
+    public String getNombre() {
+        return nombre;
+    }
+
+    /**
+     * @param nombre the nombre to set
+     */
+    public void setNombre(String nombre) {
+        this.nombre = nombre;
+    }
+
+    /**
+     * @return the tipoFragment
+     */
+    public String getTipoFragment() {
+        return tipoFragment;
+    }
+
+    /**
+     * @param tipoFragment the tipoFragment to set
+     */
+    public void setTipoFragment(String tipoFragment) {
+        this.tipoFragment = tipoFragment;
+    }
+
+    /**
+     * @return the CBIR
+     */
+    public boolean isCBIR() {
+        return CBIR;
+    }
+
+    /**
+     * @param CBIR the CBIR to set
+     */
+    public void setCBIR(boolean CBIR) {
+        this.CBIR = CBIR;
+    }
+
+    /**
+     * @return the umbralOP
+     */
+    public int getUmbralOP() {
+        return umbralOP;
+    }
+
+    /**
+     * @param umbralOP the umbralOP to set
+     */
+    public void setUmbralOP(int umbralOP) {
+        this.umbralOP = umbralOP;
+    }
+
+    /**
+     * @return the umbralCO
+     */
+    public int getUmbralCO() {
+        return umbralCO;
+    }
+
+    /**
+     * @param umbralCO the umbralCO to set
+     */
+    public void setUmbralCO(int umbralCO) {
+        this.umbralCO = umbralCO;
+    }
+
+    /**
+     * @return the atributoMultimedia
+     */
+    public String getAtributoMultimedia() {
+        return atributoMultimedia;
+    }
+
+    /**
+     * @param atributoMultimedia the atributoMultimedia to set
+     */
+    public void setAtributoMultimedia(String atributoMultimedia) {
+        this.atributoMultimedia = atributoMultimedia;
+    }
+
+    /**
+     * @return the Atributos
+     */
+    public ArrayList<Atributo> getAtributos() {
+        return Atributos;
+    }
+
+    /**
+     * @param Atributos the Atributos to set
+     */
+    public void setAtributos(ArrayList<Atributo> Atributos) {
+        this.Atributos = Atributos;
+    }
+
+    /**
+     * @return the atributoMultimediaTamanio
+     */
+    public String getAtributoMultimediaTamanio() {
+        return atributoMultimediaTamanio;
+    }
+
+    /**
+     * @param atributoMultimediaTamanio the atributoMultimediaTamanio to set
+     */
+    public void setAtributoMultimediaTamanio(String atributoMultimediaTamanio) {
+        this.atributoMultimediaTamanio = atributoMultimediaTamanio;
+    }
+
+    /**
+     * @return the atributoLlave
+     */
+    public String getAtributoLlave() {
+        return atributoLlave;
+    }
+
+    /**
+     * @param atributoLlave the atributoLlave to set
+     */
+    public void setAtributoLlave(String atributoLlave) {
+        this.atributoLlave = atributoLlave;
+    }
+
+    /**
+     * @return the idTabla
+     */
+    public String getIdTabla() {
+        return idTabla;
+    }
+
+    /**
+     * @param idTabla the idTabla to set
+     */
+    public void setIdTabla(String idTabla) {
+        this.idTabla = idTabla;
+    }
+}
