@@ -15,6 +15,7 @@ public class BD {
     private String usubd;
     private String passbd;
     private String TipoBD = "";
+    private String dirbd;
 
     /**
      * @return the portbd
@@ -84,6 +85,20 @@ public class BD {
      */
     public void setTipoBD(String TipoBD) {
         this.TipoBD = TipoBD;
+    }
+
+    /**
+     * @return the dirbd
+     */
+    public String getDirbd() {
+        return dirbd;
+    }
+
+    /**
+     * @param dirbd the dirbd to set
+     */
+    public void setDirbd(String dirbd) {
+        this.dirbd = dirbd;
     }
     
 }

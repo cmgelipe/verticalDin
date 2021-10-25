@@ -8,17 +8,14 @@ import java.util.List;
  * @author pipe
  */
 public class Tabla {
-    private String tipoFragment;
-    private boolean CBIR=false;
     private String nombre;
     private int umbralOP;
     private int umbralCO;
-    private String atributoMultimedia;
-    private String atributoMultimediaTamanio;
     private String atributoLlave;
-    private ArrayList<Atributo> Atributos;
-    private String idTabla; //mi tabla que se llama tabla, no la remota
-    
+    private String idTabla;
+    private ArrayList<Fragmento> fragmentos = null;
+    private ArrayList<Atributo> atributos;
+    AccesoDatos accesoXamana;
 
     /**
      * @return the nombre
@@ -32,34 +29,6 @@ public class Tabla {
      */
     public void setNombre(String nombre) {
         this.nombre = nombre;
-    }
-
-    /**
-     * @return the tipoFragment
-     */
-    public String getTipoFragment() {
-        return tipoFragment;
-    }
-
-    /**
-     * @param tipoFragment the tipoFragment to set
-     */
-    public void setTipoFragment(String tipoFragment) {
-        this.tipoFragment = tipoFragment;
-    }
-
-    /**
-     * @return the CBIR
-     */
-    public boolean isCBIR() {
-        return CBIR;
-    }
-
-    /**
-     * @param CBIR the CBIR to set
-     */
-    public void setCBIR(boolean CBIR) {
-        this.CBIR = CBIR;
     }
 
     /**
@@ -91,48 +60,6 @@ public class Tabla {
     }
 
     /**
-     * @return the atributoMultimedia
-     */
-    public String getAtributoMultimedia() {
-        return atributoMultimedia;
-    }
-
-    /**
-     * @param atributoMultimedia the atributoMultimedia to set
-     */
-    public void setAtributoMultimedia(String atributoMultimedia) {
-        this.atributoMultimedia = atributoMultimedia;
-    }
-
-    /**
-     * @return the Atributos
-     */
-    public ArrayList<Atributo> getAtributos() {
-        return Atributos;
-    }
-
-    /**
-     * @param Atributos the Atributos to set
-     */
-    public void setAtributos(ArrayList<Atributo> Atributos) {
-        this.Atributos = Atributos;
-    }
-
-    /**
-     * @return the atributoMultimediaTamanio
-     */
-    public String getAtributoMultimediaTamanio() {
-        return atributoMultimediaTamanio;
-    }
-
-    /**
-     * @param atributoMultimediaTamanio the atributoMultimediaTamanio to set
-     */
-    public void setAtributoMultimediaTamanio(String atributoMultimediaTamanio) {
-        this.atributoMultimediaTamanio = atributoMultimediaTamanio;
-    }
-
-    /**
      * @return the atributoLlave
      */
     public String getAtributoLlave() {
@@ -158,5 +85,102 @@ public class Tabla {
      */
     public void setIdTabla(String idTabla) {
         this.idTabla = idTabla;
+    }
+    
+    public void obtenerAtributos(){
+        try{
+            AccesoDatos acc=new AccesoDatos();
+            ArrayList arr=null;
+            if(acc.conectar()){
+                arr=acc.ejecutarConsulta("select nom, tipo, size, descriptor, multimedia from atributo "
+                        + "join fragmento on fragmento.id_fragmento=atributo.id_fragmento "
+                        + "where fragmento.id_tabla="+this.idTabla);
+                acc.desconectar();
+            }
+            if(arr!=null){
+                this.setAtributos(new ArrayList<>());
+                for(int i=0;i<arr.size();i++){
+                    Atributo att=new Atributo();
+                    att.setNombre(""+((ArrayList)arr.get(i)).get(0));
+                    att.setTipo(""+((ArrayList)arr.get(i)).get(1));
+                    att.setTamanio(""+((ArrayList)arr.get(i)).get(2));
+                    att.setDescriptor(Boolean.parseBoolean(""+((ArrayList)arr.get(i)).get(3)));
+                    att.setMultimedia(Boolean.parseBoolean(""+((ArrayList)arr.get(i)).get(4)));
+                    this.getAtributos().add(att);
+                }
+            }
+        }catch(Exception e){
+            e.printStackTrace();
+        }
+    }
+    public void llenaFragmentosxSitio(String ip) {
+        try {
+            accesoXamana = new AccesoDatos();
+            ArrayList res = null;
+            if (accesoXamana.conectar()) {
+                //¿Que fragmentos estan en el sitio a donde el vigilante esta?
+                res = accesoXamana.ejecutarConsulta("select nombre, noperaciones, ndesempenio, cbir from fragmento "
+                        + "join sitio on sitio.id_sitio=fragmento.id_sitio where id_tabla=" + this.idTabla + " "
+                        + "and direccion='" + ip + "'");
+                accesoXamana.desconectar();
+            } else {
+                System.out.println("Sin conexión");
+            }
+            if (!isNullorEmpty(res)) {
+                System.out.println("Fragmentos encontrados");
+                setFragmentos(new ArrayList<>());
+                for (Object tupla : res) {
+                    Fragmento f = new Fragmento();
+                    f.setNombre("" + ((ArrayList) tupla).get(0));
+                    f.setNoperaciones(Double.parseDouble("" + ((ArrayList) tupla).get(1)));
+                    f.setNdesempenio(Double.parseDouble("" + ((ArrayList) tupla).get(2)));
+                    f.setCbir(Boolean.parseBoolean("" + ((ArrayList) tupla).get(3)));
+                    getFragmentos().add(f);
+                }
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+     public boolean isNullorEmpty(ArrayList arr) {
+        boolean res = false;
+        try {
+            if (arr == null || arr.isEmpty()) {
+                res = true;
+            } else {
+                res = false;
+            }
+        } catch (Exception e) {
+            res = true;
+        }
+        return res;
+    }
+
+    /**
+     * @return the fragmentos
+     */
+    public ArrayList<Fragmento> getFragmentos() {
+        return fragmentos;
+    }
+
+    /**
+     * @param fragmentos the fragmentos to set
+     */
+    public void setFragmentos(ArrayList<Fragmento> fragmentos) {
+        this.fragmentos = fragmentos;
+    }
+
+    /**
+     * @return the atributos
+     */
+    public ArrayList<Atributo> getAtributos() {
+        return atributos;
+    }
+
+    /**
+     * @param atributos the atributos to set
+     */
+    public void setAtributos(ArrayList<Atributo> atributos) {
+        this.atributos = atributos;
     }
 }
