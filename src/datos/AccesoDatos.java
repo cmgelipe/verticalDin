@@ -1,4 +1,4 @@
-package verticaldin;
+package datos;
 
 import java.io.Serializable;
 import java.sql.DatabaseMetaData;
@@ -24,19 +24,19 @@ public class AccesoDatos implements Serializable {
     private static String sPwd = null;
     private java.sql.Connection oConexion;
 
-    protected AccesoDatos() throws Exception {
+    public AccesoDatos() throws Exception {
         sUrl = "jdbc:mysql://192.168.200.5/xamana?useSSL=false&serverTimezone=UTC";
         sUsr = "root";
         sPwd = "Sunny_4teamo";
     }
     
-    protected AccesoDatos(String url, String nombd, String usr, String pwd) throws Exception {
+    public AccesoDatos(String url, String nombd, String usr, String pwd) throws Exception {
         sUrl = "jdbc:mysql://"+url+"/"+nombd;//"jdbc:mysql://localhost/Master";
         sUsr = usr;//"root";
         sPwd = pwd;//"sunny_4teamo";
     }
 
-    protected boolean conectar() throws Exception {
+    public boolean conectar() throws Exception {
         boolean bRet = false;
         try {
             Class.forName("com.mysql.cj.jdbc.Driver").newInstance();
@@ -49,7 +49,7 @@ public class AccesoDatos implements Serializable {
         return bRet;
     }
 
-    protected void desconectar() throws Exception {
+    public void desconectar() throws Exception {
 
         oConexion.close();
     }
@@ -66,7 +66,7 @@ public class AccesoDatos implements Serializable {
         }
     }
 
-    protected synchronized ArrayList ejecutarConsulta(String psQuery) throws Exception {
+    public synchronized ArrayList ejecutarConsulta(String psQuery) throws Exception {
 
         Statement stmt = null;
         ResultSet rset = null;
@@ -93,7 +93,7 @@ public class AccesoDatos implements Serializable {
         return vrset;
     }
 
-    protected synchronized int ejecutarComando(String psStatement)
+    public synchronized int ejecutarComando(String psStatement)
             throws Exception {
 
         int ret = 0;
@@ -221,7 +221,7 @@ public class AccesoDatos implements Serializable {
         return ret;
     }
 
-    protected synchronized ArrayList<String> atributos(String nombreBase, String nombre) {
+    public synchronized ArrayList<String> atributos(String nombreBase, String nombre) {
         ArrayList<String> ret=new ArrayList<String>();
         try {
             DatabaseMetaData metadata=oConexion.getMetaData();

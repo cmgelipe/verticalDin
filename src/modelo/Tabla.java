@@ -1,5 +1,8 @@
-package verticaldin;
+package modelo;
 
+import modelo.Atributo;
+import modelo.Fragmento;
+import datos.AccesoDatos;
 import java.util.ArrayList;
 import java.util.List;
 
