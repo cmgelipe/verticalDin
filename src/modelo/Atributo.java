@@ -16,7 +16,17 @@ public class Atributo {
     private boolean descriptor;
     private boolean multimedia;
     
-
+    public Atributo(){
+        
+    }
+    public Atributo(String nombre, String tipo, String tamanio,boolean descriptor,boolean multimedia ){
+        this.setNombre(nombre);
+        this.setTipo(tipo);
+        this.setTamanio(tamanio);
+        this.setDescriptor(descriptor);
+        this.setMultimedia(multimedia);
+    }
+    
     /**
      * @return the nombre
      */

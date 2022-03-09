@@ -7,18 +7,23 @@ package verticaldin;
 
 import modelo.Tabla;
 import modelo.BD;
-import datos.AccesoDatos;
+import datos.AccesoDatosMy;
 import java.io.File;
 import java.io.RandomAccessFile;
+import java.net.Inet6Address;
 import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.ButtonGroup;
 import javax.swing.JOptionPane;
 import javax.swing.JRadioButton;
+import modelo.Atributo;
 
 /**
  *
@@ -26,13 +31,14 @@ import javax.swing.JRadioButton;
  */
 public class Vigilante {
 
-    AccesoDatos accesoXamana;
+    AccesoDatosMy accesoXamana;
     Tabla tabla;
     private String token;
     String miIP; //IP del nodo a donde esté el vigilante
     BD datosBD;
     long caracterLog;
     String dirLogs;
+    int numeroFragmento;
 
     public Vigilante(String token, String DirLogs) {
         this.dirLogs = DirLogs;
@@ -40,6 +46,7 @@ public class Vigilante {
         miIP = this.getIP();
         try {
             ArrayList res = null;
+            accesoXamana = new AccesoDatosMy();
             if (accesoXamana.conectar()) {
                 res = accesoXamana.ejecutarConsulta("select bd.nombre, direccion, puerto, gestor, usr, psw, "
                         + "Tabla.nombre, Tabla.umbral_op, Tabla.umbral_des from bd "
@@ -73,16 +80,34 @@ public class Vigilante {
                 boolean banderaRefragmentacion = false;
                 if (this.datosBD.getTipoBD().compareTo("a") == 0) {
                     //MYSQL
-                    while (true) {
-                        //La bandera de refragmentación indica cuando los fragmentos a analizar en los logs ya no son los mismos y es necesario 
-                        //llenar nuevamente con los nuevos fragmentos que se analizaran.
-                        if (banderaRefragmentacion) {
-                            this.tabla.llenaFragmentosxSitio(miIP);
-                            banderaRefragmentacion = false;
+
+                    //¿Es el servidor original?
+                    if (this.datosBD.getDirbd().compareTo(this.getIP()) == 0) {
+                        while (true) {
+                            //La bandera de refragmentación indica cuando los fragmentos a analizar en los logs ya no son los mismos y es necesario 
+                            //llenar nuevamente con los nuevos fragmentos que se analizaran.
+                            if (banderaRefragmentacion) {
+                                this.tabla.llenaFragmentosxSitio(miIP);
+                                banderaRefragmentacion = false;
+                            }
+                            //revisar agregado de atributos
+                            nuevosAtributos();
+                            logMySQL();
+                            Thread.sleep(300000);
                         }
-                        logMySQL();
-                        Thread.sleep(300000);
+                    }else{
+                        while (true) {
+                            //La bandera de refragmentación indica cuando los fragmentos a analizar en los logs ya no son los mismos y es necesario 
+                            //llenar nuevamente con los nuevos fragmentos que se analizaran.
+                            if (banderaRefragmentacion) {
+                                this.tabla.llenaFragmentosxSitio(miIP);
+                                banderaRefragmentacion = false;
+                            }
+                            logMySQL();
+                            Thread.sleep(300000);
+                        }
                     }
+
                 } else if (this.datosBD.getTipoBD().compareTo("b") == 0 || this.datosBD.getTipoBD().compareTo("c") == 0) {
                     //POSTGRES
                 } else {
@@ -111,83 +136,34 @@ public class Vigilante {
     }
 
     protected String getIP() {
-        String ipLocal = "";
+        String ip = "";
         try {
-            ipLocal = InetAddress.getLocalHost().getHostAddress();
-        } catch (UnknownHostException ex) {
-            ex.printStackTrace();
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            while (interfaces.hasMoreElements()) {
+                NetworkInterface iface = interfaces.nextElement();
+                if (iface.isLoopback() || !iface.isUp()) {
+                    continue;
+                }
+                Enumeration<InetAddress> addresses = iface.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    InetAddress addr = addresses.nextElement();
+
+                    if (addr instanceof Inet6Address) {
+                        continue;
+                    }
+
+                    ip = addr.getHostAddress();
+                    System.out.println(ip);
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
-        return ipLocal;
+        return ip;
     }
 
     private void logMySQL() {
-        try {
-            //Buscar si atributos en tabla original estan registrados en xamana
-            AccesoDatos accExterno = new AccesoDatos(this.datosBD.getDirbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
-            ArrayList<String> atts = null;
-            if (accExterno.conectar()) {
-                atts = accExterno.atributos(this.datosBD.getNombd(), this.tabla.getNombre());
-                accExterno.desconectar();
-            }
-            ArrayList<String> nombresAtributosEnXamana = new ArrayList<>();
-            this.tabla.getAtributos().forEach(x -> nombresAtributosEnXamana.add(x.getNombre()));
-            if (!this.isNullorEmpty(atts)) {
-                for (String att : atts) {
-                    String nombre = att.split(":")[0];
-                    if (!nombresAtributosEnXamana.contains(nombre)) {
-                        JRadioButton rbtn1 = new JRadioButton("Descriptor", true);
-                        JRadioButton rbtn2 = new JRadioButton("Multimedia", false);
-                        JRadioButton rbtn3 = new JRadioButton("Ninguna opción anterior", false);
-                        ButtonGroup grupo1 = new ButtonGroup();
-                        grupo1.add(rbtn1);
-                        grupo1.add(rbtn2);
-                        grupo1.add(rbtn3);
-                        String message = "El atributo " + nombre + ", agregado recientemente, es:";
-                        Object[] params = {message, rbtn1, rbtn2, rbtn3};
-                        int n = JOptionPane.showConfirmDialog(null, params, "Tipo de atributo", JOptionPane.DEFAULT_OPTION);
-                        //Si es descriptor o multimedia, revisar si ya se encuentra agregado el otro, para lazar una nueva fragmentación
-                        //y agregar este atributo a la base de datos
-                        //en caso de no ser descriptor o multimedia, agregarlo directamente a la base de datos
-                        if (!rbtn3.isSelected()) {
-                            if (rbtn1.isSelected()) {
-                                //revisar si ya hay un multimedia agregado a xamana en la tabla original
-                                ArrayList res = null;
-                                if (accesoXamana.conectar()) {
-                                    res = accesoXamana.ejecutarConsulta("select nom, tipo, size from Atributo where multimedia=1 and id_tabla=" + this.token);
-                                    accesoXamana.desconectar();
-                                }
-                                if (!this.isNullorEmpty(res)) {
-                                    //registrar atributo en xamana
-                                    int t = 0;
-                                    if (this.accesoXamana.conectar()) {
-                                        t = this.accesoXamana.ejecutarComando("insert into atributo (tipo,size,nom,descriptor,multimedia,id_tabla) values ('" + att.split(":")[1] + "'," + att.split(":")[2] + ",'" + att.split(":")[0] + "'," + 1 + "," + 0 + "," + this.token + ")");
-                                        this.accesoXamana.desconectar();
-                                    }
-                                    if (t == 1) {
-                                        System.out.println("Atributo insertado");
-                                    } else {
-                                        System.out.println("Atributo no insertado");
-                                    }
-                                    //buscar en log que sitio ocupó más estos atributos
-                                    String sitio = buscaSitioXUsoAtributosMYSQL(nombre, "" + ((ArrayList) res.get(0)).get(0));
-                                    //AQUI ME QUEDÉ
-                                    //CONECTARME PARA GENERAR TABLA Y COLOCAR ATRIBUTOS CBIR (Y PK)
-
-                                }
-                            } else if (rbtn2.isSelected()) {
-
-                            }
-                        }else{
-                            //atributo normal
-                        } 
-                    }
-                }
-            } else {
-                System.out.println("Alguien borró los atributos de la tabla recientemente");
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        
         try {
             RandomAccessFile raf = new RandomAccessFile(this.dirLogs, "r");
             raf.seek(this.caracterLog);
@@ -235,12 +211,12 @@ public class Vigilante {
         /*
          Método para buscar en log el sitio que más ocupa atributos CBIR
          */
-        String IPmasOcupada="";
+        String IPmasOcupada = "";
         try {
             File carpeta = new File(dirLogs);
             File archivos[] = carpeta.listFiles();
             HashMap<String, ArrayList> NombreIpUsos = new HashMap<>();
-            
+
             for (File item : archivos) {
                 if (item.isFile()) {
                     RandomAccessFile raf = new RandomAccessFile(item.toString(), "r");
@@ -255,37 +231,120 @@ public class Vigilante {
                             if (ip.toLowerCase().compareTo("localhost") == 0 || ip.toLowerCase().compareTo("::1") == 0) {
                                 ip = "127.0.0.1";
                             }
-                            ArrayList IpUso=new ArrayList<>();
+                            ArrayList IpUso = new ArrayList<>();
                             IpUso.add(ip);  //IP
-                            if(NombreIpUsos.get(nombre)!=null){
-                                IpUso.add(((Integer)NombreIpUsos.get(nombre).get(1)));
-                            }else{
+                            if (NombreIpUsos.get(nombre) != null) {
+                                IpUso.add(((Integer) NombreIpUsos.get(nombre).get(1)));
+                            } else {
                                 IpUso.add(new Integer(0));
                             }
-                            NombreIpUsos.put(nombre,IpUso);
+                            NombreIpUsos.put(nombre, IpUso);
                         }
                         if (actual.toLowerCase().contains(att1) || actual.toLowerCase().contains(att2)) {
                             String y[] = actual.split("\t");
                             nombre = y[1].substring(0, y[1].indexOf(" "));
-                            NombreIpUsos.get(nombre).set(1,((Integer)NombreIpUsos.get(nombre).get(1))+1);
+                            NombreIpUsos.get(nombre).set(1, ((Integer) NombreIpUsos.get(nombre).get(1)) + 1);
                         }
 
                     }
                 }
             }
-            ArrayList valores=new ArrayList<>(NombreIpUsos.values());
-            int aux=0;
-            for(int p=0;p<valores.size();p++){
-                ArrayList aux2=(ArrayList)valores.get(p);
-                if(((Integer)aux2.get(1))>aux){
-                    aux=(Integer)aux2.get(1);
-                    IPmasOcupada=""+aux2.get(0);
+            ArrayList valores = new ArrayList<>(NombreIpUsos.values());
+            int aux = 0;
+            for (int p = 0; p < valores.size(); p++) {
+                ArrayList aux2 = (ArrayList) valores.get(p);
+                if (((Integer) aux2.get(1)) > aux) {
+                    aux = (Integer) aux2.get(1);
+                    IPmasOcupada = "" + aux2.get(0);
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
         return IPmasOcupada;
+    }
+    
+    // Solo para servidor original (nodos no deben modificar sus atributos directamente)
+    public void nuevosAtributos() {
+        try {
+            //Buscar si atributos en tabla original estan registrados en xamana
+            AccesoDatosMy accExterno = new AccesoDatosMy(this.datosBD.getDirbd()+":"+this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+            ArrayList<String> atts = null;
+            if (accExterno.conectar()) {
+                atts = accExterno.atributos(this.datosBD.getNombd(), this.tabla.getNombre());
+                accExterno.desconectar();
+            }
+            ArrayList<String> nombresAtributosEnXamana = new ArrayList<>();
+            this.tabla.getAtributos().forEach(x -> nombresAtributosEnXamana.add(x.getNombre()));
+            if (!this.isNullorEmpty(atts)) {
+                for (String att : atts) {
+                    String nombre = att.split(":")[0];
+                    if (!nombresAtributosEnXamana.contains(nombre)) {
+                        JRadioButton rbtn1 = new JRadioButton("Descriptor", true);
+                        JRadioButton rbtn2 = new JRadioButton("Multimedia", false);
+                        JRadioButton rbtn3 = new JRadioButton("Ninguna opción anterior", false);
+                        ButtonGroup grupo1 = new ButtonGroup();
+                        grupo1.add(rbtn1);
+                        grupo1.add(rbtn2);
+                        grupo1.add(rbtn3);
+                        String message = "El atributo " + nombre + ", agregado recientemente, es:";
+                        Object[] params = {message, rbtn1, rbtn2, rbtn3};
+                        int n = JOptionPane.showConfirmDialog(null, params, "Tipo de atributo", JOptionPane.DEFAULT_OPTION);
+                        //Si es descriptor o multimedia, revisar si ya se encuentra agregado el otro, para lazar una nueva fragmentación
+                        //y agregar este atributo a la base de datos
+                        //en caso de no ser descriptor o multimedia, agregarlo directamente a la base de datos
+                        if (!rbtn3.isSelected()) {
+                            if (rbtn1.isSelected() || rbtn2.isSelected()) {
+                                //revisar si ya hay un multimedia agregado a xamana en la tabla original
+                                ArrayList res = null;
+                                if (accesoXamana.conectar()) {
+                                    if (rbtn1.isSelected()) {
+                                        res = accesoXamana.ejecutarConsulta("select nom, tipo, size from Atributo where multimedia=1 and id_tabla=" + this.token);
+                                    } else if (rbtn2.isSelected()) {
+                                        res = accesoXamana.ejecutarConsulta("select nom, tipo, size from Atributo where descriptor=1 and id_tabla=" + this.token);
+                                    }
+                                    accesoXamana.desconectar();
+                                }
+                                if (!this.isNullorEmpty(res)) {
+                                    //registrar atributo en xamana
+                                    int t = 0;
+                                    if (this.accesoXamana.conectar()) {
+                                        if (rbtn1.isSelected()) {
+                                            t = this.accesoXamana.ejecutarComando("insert into atributo (tipo,size,nom,descriptor,multimedia,id_tabla) values ('" + att.split(":")[1] + "'," + att.split(":")[2] + ",'" + att.split(":")[0] + "'," + 1 + "," + 0 + "," + this.token + ")");
+                                        } else if (rbtn2.isSelected()) {
+                                            t = this.accesoXamana.ejecutarComando("insert into atributo (tipo,size,nom,descriptor,multimedia,id_tabla) values ('" + att.split(":")[1] + "'," + att.split(":")[2] + ",'" + att.split(":")[0] + "'," + 0 + "," + 1 + "," + this.token + ")");
+                                        }
+                                        this.accesoXamana.desconectar();
+                                    }
+                                    if (t == 1) {
+                                        System.out.println("Atributo insertado");
+                                    } else {
+                                        System.out.println("Atributo no insertado");
+                                    }
+                                    //buscar en log que sitio ocupó más estos atributos
+                                    String sitio = buscaSitioXUsoAtributosMYSQL(nombre, "" + ((ArrayList) res.get(0)).get(0));
+                                    //origen
+                                    AccesoDatosMy accO = new AccesoDatosMy(this.datosBD.getDirbd()+":"+this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+                                    //Destino
+                                    AccesoDatosMy accD = new AccesoDatosMy(sitio+":"+this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+                                    //Atributos
+                                    Atributo att1 = new Atributo(nombre, att.split(":")[1], att.split(":")[1], (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false);
+                                    Atributo att2 = new Atributo("" + ((ArrayList) res.get(0)).get(0), "" + ((ArrayList) res.get(0)).get(1), "" + ((ArrayList) res.get(0)).get(2), (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false);
+                                    ArrayList<Atributo> atributos = new ArrayList<>(Arrays.asList(att1, att2));
+                                    Fragmentador f = new Fragmentador(accO, accD, atributos, "a",this.tabla.getNombre(),this.numeroFragmento++);
+                                }
+                            }
+                        } else {
+                            //atributo normal
+                        }
+                    }
+                }
+            } else {
+                System.out.println("Alguien borró los atributos de la tabla recientemente");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
 }

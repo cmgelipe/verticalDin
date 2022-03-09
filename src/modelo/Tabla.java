@@ -2,7 +2,7 @@ package modelo;
 
 import modelo.Atributo;
 import modelo.Fragmento;
-import datos.AccesoDatos;
+import datos.AccesoDatosMy;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,7 +18,7 @@ public class Tabla {
     private String idTabla;
     private ArrayList<Fragmento> fragmentos = null;
     private ArrayList<Atributo> atributos;
-    AccesoDatos accesoXamana;
+    AccesoDatosMy accesoXamana;
 
     /**
      * @return the nombre
@@ -92,7 +92,7 @@ public class Tabla {
     
     public void obtenerAtributos(){
         try{
-            AccesoDatos acc=new AccesoDatos();
+            AccesoDatosMy acc=new AccesoDatosMy();
             ArrayList arr=null;
             if(acc.conectar()){
                 arr=acc.ejecutarConsulta("select nom, tipo, size, descriptor, multimedia from atributo "
@@ -118,7 +118,7 @@ public class Tabla {
     }
     public void llenaFragmentosxSitio(String ip) {
         try {
-            accesoXamana = new AccesoDatos();
+            accesoXamana = new AccesoDatosMy();
             ArrayList res = null;
             if (accesoXamana.conectar()) {
                 //¿Que fragmentos estan en el sitio a donde el vigilante esta?

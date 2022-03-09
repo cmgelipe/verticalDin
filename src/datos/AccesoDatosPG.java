@@ -18,7 +18,7 @@ import java.util.logging.Logger;
  * están fijos, pero deben leerse de un archivo encriptado Autor: Beatriz A.
  * Olivares Zepahua Fecha: Enero 2004
  */
-public final class AccesoDatosPG implements Serializable {
+public final class AccesoDatosPG extends AccesoDatos implements Serializable {
 
     private static String sUrl = null;  // sUrl de conexión
     private static String sUsr = null; // Usuario
@@ -42,6 +42,7 @@ public final class AccesoDatosPG implements Serializable {
     /**
      * Realiza la conexión a la base de datos.
      */
+    @Override
     public boolean conectar() throws Exception {
         boolean bRet = false;
         try {
@@ -283,6 +284,7 @@ public final class AccesoDatosPG implements Serializable {
         return CadenaEntrada;
     }
 
+    @Override
     public synchronized ArrayList<String> atributos(String nombreBase, String nombre) {
         ArrayList<String> ret = new ArrayList<String>();
         try {
@@ -292,7 +294,7 @@ public final class AccesoDatosPG implements Serializable {
                 ret.add(atributos.getString("COLUMN_NAME") + ":" + atributos.getString("TYPE_NAME") + ":" + atributos.getString("COLUMN_SIZE"));
             }
         } catch (SQLException ex) {
-            Logger.getLogger(AccesoDatos.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(AccesoDatosMy.class.getName()).log(Level.SEVERE, null, ex);
         }
         return ret;
     }

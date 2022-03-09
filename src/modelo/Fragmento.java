@@ -5,7 +5,7 @@
  */
 package modelo;
 
-import datos.AccesoDatos;
+import datos.AccesoDatosMy;
 import java.util.ArrayList;
 
 /**
@@ -92,7 +92,7 @@ public class Fragmento {
     public ArrayList<Atributo> obtenerAtributos(){
         ArrayList<Atributo> res=new ArrayList<>();
         try{
-            AccesoDatos acc=new AccesoDatos();
+            AccesoDatosMy acc=new AccesoDatosMy();
             ArrayList arr=null;    
             if(acc.conectar()){
                 arr=acc.ejecutarConsulta("select nom, tipo, size, descriptor, multimedia from atributo where id_fragmento="+this.id_fragmento);

@@ -22,7 +22,7 @@ import org.json.JSONObject;
  *
  * @author pipe
  */
-public class AccesoDatosMG implements Serializable {
+public class AccesoDatosMG extends AccesoDatos implements Serializable {
 
     public String sUrl = null;  // sUrl de conexión
     public String sUsr = null; // Usuario
@@ -37,6 +37,7 @@ public class AccesoDatosMG implements Serializable {
         this.setTabla(tabla);
     }
 
+    @Override
     public boolean conectar() throws Exception {
         String mongoClientURI = "";
         if (sUsr.isEmpty()) {
@@ -63,6 +64,7 @@ public class AccesoDatosMG implements Serializable {
         this.tabla = tabla;
     }
 
+    @Override
     public synchronized ArrayList<String> atributos(String nombreBase, String nombre) {
         ArrayList<String> res=new ArrayList<>();
         MongoDatabase db = this.getMongoClient().getDatabase(nombreBase);
@@ -97,5 +99,11 @@ public class AccesoDatosMG implements Serializable {
      */
     public void setMongoClient(MongoClient mongoClient) {
         this.mongoClient = mongoClient;
+    }
+
+    @Override
+    public void desconectar() throws Exception {
+        this.mongoClient.close();
+        
     }
 }
