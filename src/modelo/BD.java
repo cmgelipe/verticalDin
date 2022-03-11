@@ -5,6 +5,8 @@
  */
 package modelo;
 
+import java.util.ArrayList;
+
 /**
  *
  * @author pipe
@@ -16,6 +18,7 @@ public class BD {
     private String passbd;
     private String TipoBD = "";
     private String dirbd;
+    private Tabla tabla;
 
     /**
      * @return the portbd
@@ -99,6 +102,20 @@ public class BD {
      */
     public void setDirbd(String dirbd) {
         this.dirbd = dirbd;
+    }
+
+    /**
+     * @return the tablas
+     */
+    public Tabla getTabla() {
+        return tabla;
+    }
+
+    /**
+     * @param tablas the tablas to set
+     */
+    public void setTabla(Tabla tablas) {
+        this.tabla = tablas;
     }
     
 }

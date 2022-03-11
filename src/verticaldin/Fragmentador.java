@@ -11,6 +11,8 @@ import datos.AccesoDatosMy;
 import datos.AccesoDatosPG;
 import java.util.ArrayList;
 import modelo.Atributo;
+import modelo.BD;
+import modelo.Tabla;
 
 /**
  *
@@ -21,25 +23,23 @@ public class Fragmentador {
     private AccesoDatos origen;
     private AccesoDatos destino;
     private ArrayList<Atributo> atts;
-    private String tipoBD;
-    private String nTabla;
+    private BD datosBD;
     int nFragmento;
 
-    public Fragmentador(AccesoDatos origen, AccesoDatos destino, ArrayList<Atributo> atts, String tipoBD, String nTabla, int nFragmento) {
+    public Fragmentador(AccesoDatos origen, AccesoDatos destino, ArrayList<Atributo> atts, BD datosBD, int nFragmento) {
         this.setOrigen(origen);
         this.setDestino(destino);
         this.setAtts(atts);
-        this.setTipoBD(tipoBD);
-        this.setnTabla(nTabla);
+        this.datosBD=datosBD;
         this.nFragmento = nFragmento;
     }
 
     public boolean generarFragmentos() {
-        if (this.getTipoBD().compareTo("a") == 0) {
+        if (this.datosBD.getTipoBD().compareTo("a") == 0) {
             generarFragmentosMySQL();
-        } else if (this.getTipoBD().compareTo("b") == 0 || this.getTipoBD().compareTo("c") == 0) {
+        } else if (this.datosBD.getTipoBD().compareTo("b") == 0 || this.datosBD.getTipoBD().compareTo("c") == 0) {
             generarFragmentosPost();
-        } else if (this.getTipoBD().compareTo("d") == 0) {
+        } else if (this.datosBD.getTipoBD().compareTo("d") == 0) {
             generarFragmentosMongo();
         } else {
             System.out.println("No es un tipo de BD válido");
@@ -89,25 +89,14 @@ public class Fragmentador {
         this.atts = atts;
     }
 
-    /**
-     * @return the tipoBD
-     */
-    public String getTipoBD() {
-        return tipoBD;
-    }
-
-    /**
-     * @param tipoBD the tipoBD to set
-     */
-    public void setTipoBD(String tipoBD) {
-        this.tipoBD = tipoBD;
-    }
+   
 
     private void generarFragmentosMySQL() {
         AccesoDatosMy accOrigen = (AccesoDatosMy) this.origen;
         AccesoDatosMy accDestino = (AccesoDatosMy) this.destino;
         try {
             //Crear nueva tabla
+            this.datosBD.getTabla().setAtributoLlave(this.llaveMySQL(accOrigen,this.datosBD.getNombd(), this.datosBD.getTabla().getNombre()));
             String att_tipo = "";
             for (Atributo r : this.getAtts()) {
                 if (this.transTipoDato(r.getTipo()) != 0) {
@@ -122,11 +111,11 @@ public class Fragmentador {
             }
             att_tipo = att_tipo.substring(0, att_tipo.length() - 2);
             if (accDestino.conectar()) {
-                accDestino.ejecutarComando("create table " + this.getnTabla() + "_f" + this.nFragmento + " (" + att_tipo + ");");
+                accDestino.ejecutarComando("create table " + this.datosBD.getTabla().getNombre()+ "_f" + this.nFragmento + " (" + att_tipo + ");");
                 accDestino.desconectar();
             }
             if (accOrigen.conectar()) {
-                accOrigen.ejecutarConsulta(tipoBD);
+                accOrigen.ejecutarConsulta("");
                 accOrigen.desconectar();
             }
         } catch (Exception e) {
@@ -159,19 +148,6 @@ public class Fragmentador {
         }
     }
 
-    /**
-     * @return the nTabla
-     */
-    public String getnTabla() {
-        return nTabla;
-    }
-
-    /**
-     * @param nTabla the nTabla to set
-     */
-    public void setnTabla(String nTabla) {
-        this.nTabla = nTabla;
-    }
 
     public int transTipoDato(String tipo) {
         tipo = tipo.toUpperCase();
@@ -200,4 +176,52 @@ public class Fragmentador {
 
     }
 
+    protected Atributo llaveMySQL(AccesoDatosMy acc, String nombreBase, String nombreTabla) {
+
+        Atributo att = null;
+        ArrayList res = null;
+        try {
+            if (acc.conectar()) {
+                res = acc.ejecutarConsulta("SELECT COLUMN_NAME, DATA_TYPE, COLUMN_KEY FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '" + nombreBase + "' AND TABLE_NAME = '" + nombreTabla + "' and COLUMN_KEY IN('PRI', 'UNI')");
+                acc.desconectar();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        if (res != null) {
+            att = new Atributo();
+            att.setNombre("" + ((ArrayList) res.get(0)).get(0));
+            att.setTipo("" + ((ArrayList) res.get(0)).get(1));
+        }
+        return att;
+    }
+
+    public Atributo llavePostgres(AccesoDatosPG acc, String nombreBase, String nombreTabla) {
+
+        Atributo att = null;
+        ArrayList res = null;
+        try {
+            if (acc.conectar()) {
+                String q = "select nombre, data_type "
+                        + "from (SELECT column_name as nombre "
+                        + "FROM information_schema.key_column_usage "
+                        + "WHERE TABLE_NAME='" + nombreTabla + "' "
+                        + "AND TABLE_CATALOG='" + nombreBase + "') as a "
+                        + "join INFORMATION_SCHEMA.COLUMNS "
+                        + "on INFORMATION_SCHEMA.COLUMNS.COLUMN_NAME=nombre "
+                        + "where INFORMATION_SCHEMA.COLUMNS.TABLE_NAME='" + nombreTabla + "' "
+                        + "and INFORMATION_SCHEMA.COLUMNS.TABLE_CATALOG='" + nombreBase + "';";
+                res = acc.ejecutarConsulta(q);
+                acc.desconectar();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        if (res != null) {
+            att = new Atributo();
+            att.setNombre("" + ((ArrayList) res.get(0)).get(0));
+            att.setTipo("" + ((ArrayList) res.get(0)).get(1));
+        }
+        return att;
+    }
 }

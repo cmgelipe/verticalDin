@@ -32,7 +32,6 @@ import modelo.Atributo;
 public class Vigilante {
 
     AccesoDatosMy accesoXamana;
-    Tabla tabla;
     private String token;
     String miIP; //IP del nodo a donde esté el vigilante
     BD datosBD;
@@ -65,12 +64,13 @@ public class Vigilante {
                 this.datosBD.setTipoBD("" + ((ArrayList) res.get(0)).get(3));
                 this.datosBD.setUsubd("" + ((ArrayList) res.get(0)).get(4));
                 this.datosBD.setPassbd("" + ((ArrayList) res.get(0)).get(5));
-                this.tabla = new Tabla();
-                this.tabla.setIdTabla(token);
-                this.tabla.setNombre("" + ((ArrayList) res.get(0)).get(6));
-                this.tabla.setUmbralOP(Integer.parseInt("" + ((ArrayList) res.get(0)).get(7)));
-                this.tabla.setUmbralCO(Integer.parseInt("" + ((ArrayList) res.get(0)).get(8)));
-                this.tabla.llenaFragmentosxSitio(miIP);
+                Tabla tabla=new Tabla();
+                tabla.setIdTabla(token);
+                tabla.setNombre("" + ((ArrayList) res.get(0)).get(6));
+                tabla.setUmbralOP(Integer.parseInt("" + ((ArrayList) res.get(0)).get(7)));
+                tabla.setUmbralCO(Integer.parseInt("" + ((ArrayList) res.get(0)).get(8)));
+                tabla.llenaFragmentosxSitio(miIP);
+                this.datosBD.setTabla(tabla);
                 //Análisis de logs para detectar nuevos atributos (alter table add column), comparar atributos de base de xamana
                 // para detectar el atributo nuevo, preguntar si es descriptor o multimedia, agregarlo a la base de xamana
                 //si es descriptor o multimedia, hasta que este el duo de atributos separar en un nuevo fragmento.
@@ -87,7 +87,7 @@ public class Vigilante {
                             //La bandera de refragmentación indica cuando los fragmentos a analizar en los logs ya no son los mismos y es necesario 
                             //llenar nuevamente con los nuevos fragmentos que se analizaran.
                             if (banderaRefragmentacion) {
-                                this.tabla.llenaFragmentosxSitio(miIP);
+                                this.datosBD.getTabla().llenaFragmentosxSitio(miIP);
                                 banderaRefragmentacion = false;
                             }
                             //revisar agregado de atributos
@@ -100,7 +100,7 @@ public class Vigilante {
                             //La bandera de refragmentación indica cuando los fragmentos a analizar en los logs ya no son los mismos y es necesario 
                             //llenar nuevamente con los nuevos fragmentos que se analizaran.
                             if (banderaRefragmentacion) {
-                                this.tabla.llenaFragmentosxSitio(miIP);
+                                this.datosBD.getTabla().llenaFragmentosxSitio(miIP);
                                 banderaRefragmentacion = false;
                             }
                             logMySQL();
@@ -171,9 +171,9 @@ public class Vigilante {
                 String linea = raf.readLine();
                 this.caracterLog = raf.getFilePointer();
 
-                for (int i = 0; i < this.tabla.getFragmentos().size(); i++) {
+                for (int i = 0; i < this.datosBD.getTabla().getFragmentos().size(); i++) {
                     //Paso 1 identificar si hubo un alter de la tabla original para agregar columnas
-                    if (linea.toLowerCase().contains("alter table") && linea.toLowerCase().contains(this.tabla.getNombre().toLowerCase())
+                    if (linea.toLowerCase().contains("alter table") && linea.toLowerCase().contains(this.datosBD.getTabla().getNombre().toLowerCase())
                             && linea.toLowerCase().contains("add")) {
                         //conectarme a su base de datos para obtener el nuevo atributo
 
@@ -271,11 +271,11 @@ public class Vigilante {
             AccesoDatosMy accExterno = new AccesoDatosMy(this.datosBD.getDirbd()+":"+this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
             ArrayList<String> atts = null;
             if (accExterno.conectar()) {
-                atts = accExterno.atributos(this.datosBD.getNombd(), this.tabla.getNombre());
+                atts = accExterno.atributos(this.datosBD.getNombd(), this.datosBD.getTabla().getNombre());
                 accExterno.desconectar();
             }
             ArrayList<String> nombresAtributosEnXamana = new ArrayList<>();
-            this.tabla.getAtributos().forEach(x -> nombresAtributosEnXamana.add(x.getNombre()));
+            this.datosBD.getTabla().getAtributos().forEach(x -> nombresAtributosEnXamana.add(x.getNombre()));
             if (!this.isNullorEmpty(atts)) {
                 for (String att : atts) {
                     String nombre = att.split(":")[0];
@@ -331,7 +331,7 @@ public class Vigilante {
                                     Atributo att1 = new Atributo(nombre, att.split(":")[1], att.split(":")[1], (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false);
                                     Atributo att2 = new Atributo("" + ((ArrayList) res.get(0)).get(0), "" + ((ArrayList) res.get(0)).get(1), "" + ((ArrayList) res.get(0)).get(2), (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false);
                                     ArrayList<Atributo> atributos = new ArrayList<>(Arrays.asList(att1, att2));
-                                    Fragmentador f = new Fragmentador(accO, accD, atributos, "a",this.tabla.getNombre(),this.numeroFragmento++);
+                                    Fragmentador f = new Fragmentador(accO, accD, atributos, this.datosBD,this.numeroFragmento++);
                                 }
                             }
                         } else {

@@ -14,7 +14,7 @@ public class Tabla {
     private String nombre;
     private int umbralOP;
     private int umbralCO;
-    private String atributoLlave;
+    private Atributo atributoLlave;
     private String idTabla;
     private ArrayList<Fragmento> fragmentos = null;
     private ArrayList<Atributo> atributos;
@@ -65,14 +65,14 @@ public class Tabla {
     /**
      * @return the atributoLlave
      */
-    public String getAtributoLlave() {
+    public Atributo getAtributoLlave() {
         return atributoLlave;
     }
 
     /**
      * @param atributoLlave the atributoLlave to set
      */
-    public void setAtributoLlave(String atributoLlave) {
+    public void setAtributoLlave(Atributo atributoLlave) {
         this.atributoLlave = atributoLlave;
     }
 
