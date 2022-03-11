@@ -8,6 +8,7 @@ package verticaldin;
 import modelo.Tabla;
 import modelo.BD;
 import datos.AccesoDatosMy;
+import datos.AccesoDatosPG;
 import java.io.File;
 import java.io.RandomAccessFile;
 import java.net.Inet6Address;
@@ -328,9 +329,10 @@ public class Vigilante {
                                     //Destino
                                     AccesoDatosMy accD = new AccesoDatosMy(sitio+":"+this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
                                     //Atributos
+                                    this.datosBD.getTabla().setAtributoLlave(this.llaveMySQL(accO, this.datosBD.getNombd(), this.datosBD.getTabla().getNombre()));
                                     Atributo att1 = new Atributo(nombre, att.split(":")[1], att.split(":")[1], (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false);
                                     Atributo att2 = new Atributo("" + ((ArrayList) res.get(0)).get(0), "" + ((ArrayList) res.get(0)).get(1), "" + ((ArrayList) res.get(0)).get(2), (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false);
-                                    ArrayList<Atributo> atributos = new ArrayList<>(Arrays.asList(att1, att2));
+                                    ArrayList<Atributo> atributos = new ArrayList<>(Arrays.asList(this.datosBD.getTabla().getAtributoLlave(),att1, att2));
                                     Fragmentador f = new Fragmentador(accO, accD, atributos, this.datosBD,this.numeroFragmento++);
                                 }
                             }
@@ -347,4 +349,51 @@ public class Vigilante {
         }
     }
 
+    public Atributo llavePostgres(AccesoDatosPG acc, String nombreBase, String nombreTabla) {
+
+        Atributo att = null;
+        ArrayList res = null;
+        try {
+            if (acc.conectar()) {
+                String q = "select nombre, data_type "
+                        + "from (SELECT column_name as nombre "
+                        + "FROM information_schema.key_column_usage "
+                        + "WHERE TABLE_NAME='" + nombreTabla + "' "
+                        + "AND TABLE_CATALOG='" + nombreBase + "') as a "
+                        + "join INFORMATION_SCHEMA.COLUMNS "
+                        + "on INFORMATION_SCHEMA.COLUMNS.COLUMN_NAME=nombre "
+                        + "where INFORMATION_SCHEMA.COLUMNS.TABLE_NAME='" + nombreTabla + "' "
+                        + "and INFORMATION_SCHEMA.COLUMNS.TABLE_CATALOG='" + nombreBase + "';";
+                res = acc.ejecutarConsulta(q);
+                acc.desconectar();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        if (res != null) {
+            att = new Atributo();
+            att.setNombre("" + ((ArrayList) res.get(0)).get(0));
+            att.setTipo("" + ((ArrayList) res.get(0)).get(1));
+        }
+        return att;
+    }
+     protected Atributo llaveMySQL(AccesoDatosMy acc, String nombreBase, String nombreTabla) {
+
+        Atributo att = null;
+        ArrayList res = null;
+        try {
+            if (acc.conectar()) {
+                res = acc.ejecutarConsulta("SELECT COLUMN_NAME, DATA_TYPE, COLUMN_KEY FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '" + nombreBase + "' AND TABLE_NAME = '" + nombreTabla + "' and COLUMN_KEY IN('PRI', 'UNI')");
+                acc.desconectar();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        if (res != null) {
+            att = new Atributo();
+            att.setNombre("" + ((ArrayList) res.get(0)).get(0));
+            att.setTipo("" + ((ArrayList) res.get(0)).get(1));
+        }
+        return att;
+    }
 }

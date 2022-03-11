@@ -30,17 +30,17 @@ public class Fragmentador {
         this.setOrigen(origen);
         this.setDestino(destino);
         this.setAtts(atts);
-        this.datosBD=datosBD;
+        this.datosBD = datosBD;
         this.nFragmento = nFragmento;
     }
 
     public boolean generarFragmentos() {
         if (this.datosBD.getTipoBD().compareTo("a") == 0) {
-            generarFragmentosMySQL();
+            generarFragmentoMySQL();
         } else if (this.datosBD.getTipoBD().compareTo("b") == 0 || this.datosBD.getTipoBD().compareTo("c") == 0) {
-            generarFragmentosPost();
+            generarFragmentoPost();
         } else if (this.datosBD.getTipoBD().compareTo("d") == 0) {
-            generarFragmentosMongo();
+            generarFragmentoMongo();
         } else {
             System.out.println("No es un tipo de BD válido");
         }
@@ -89,16 +89,14 @@ public class Fragmentador {
         this.atts = atts;
     }
 
-   
-
-    private void generarFragmentosMySQL() {
+    private void generarFragmentoMySQL() {
         AccesoDatosMy accOrigen = (AccesoDatosMy) this.origen;
         AccesoDatosMy accDestino = (AccesoDatosMy) this.destino;
         try {
-            //Crear nueva tabla
-            this.datosBD.getTabla().setAtributoLlave(this.llaveMySQL(accOrigen,this.datosBD.getNombd(), this.datosBD.getTabla().getNombre()));
             String att_tipo = "";
+            String att_nombre = "";
             for (Atributo r : this.getAtts()) {
+                att_nombre += r.getNombre() + ", ";
                 if (this.transTipoDato(r.getTipo()) != 0) {
                     att_tipo += r.getNombre() + " " + r.getTipo() + ", ";
                 } else {
@@ -110,21 +108,40 @@ public class Fragmentador {
                 }
             }
             att_tipo = att_tipo.substring(0, att_tipo.length() - 2);
-            if (accDestino.conectar()) {
-                accDestino.ejecutarComando("create table " + this.datosBD.getTabla().getNombre()+ "_f" + this.nFragmento + " (" + att_tipo + ");");
-                accDestino.desconectar();
-            }
+            att_nombre = att_nombre.substring(0, att_nombre.length() - 2);
+            //recuperar datos
+            ArrayList arr = null;
             if (accOrigen.conectar()) {
-                accOrigen.ejecutarConsulta("");
+                arr = accOrigen.ejecutarConsulta("select " + att_nombre + " from " + this.datosBD.getTabla().getNombre());
                 accOrigen.desconectar();
+            }
+            if (!this.isNullorEmpty(arr)) {
+                //Crear nueva tabla
+                if (accDestino.conectar()) {
+                    accDestino.ejecutarComando("create table " + this.datosBD.getTabla().getNombre() + "_f" + this.nFragmento + " (" + att_tipo + ", PRIMARY KEY (" + this.datosBD.getTabla().getAtributoLlave().getNombre() + "));");
+                    //agregar datos
+                    for (int i = 0; i < arr.size(); i++) {
+                        String valores = "";
+                        for (int j=0; j < ((ArrayList) arr.get(0)).size(); j++) {
+                            if (this.transTipoDato(this.getAtts().get(j).getTipo()) == 0 || this.transTipoDato(this.getAtts().get(j).getTipo()) == 2) {
+                                valores += "\"" + ((ArrayList) arr.get(i)).get(j) + "\", ";
+                            } else {
+                                valores += ((ArrayList) arr.get(i)).get(j) + ", ";
+                            }
+                            valores = valores.substring(0, valores.length() - 2);
+                            String q = "INSERT INTO " + this.datosBD.getTabla().getNombre() + "_f" + this.nFragmento+ " VALUES (" + valores + ");";
+                            accDestino.ejecutarComando(q);
+                        }
+                    }
+                    accDestino.desconectar();
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
-
     }
 
-    private void generarFragmentosPost() {
+    private void generarFragmentoPost() {
         AccesoDatosPG accOrigen = (AccesoDatosPG) this.origen;
         AccesoDatosPG accDestino = (AccesoDatosPG) this.destino;
         try {
@@ -136,7 +153,7 @@ public class Fragmentador {
         }
     }
 
-    private void generarFragmentosMongo() {
+    private void generarFragmentoMongo() {
         AccesoDatosMG accOrigen = (AccesoDatosMG) this.origen;
         AccesoDatosMG accDestino = (AccesoDatosMG) this.destino;
         try {
@@ -147,7 +164,6 @@ public class Fragmentador {
             e.printStackTrace();
         }
     }
-
 
     public int transTipoDato(String tipo) {
         tipo = tipo.toUpperCase();
@@ -176,52 +192,17 @@ public class Fragmentador {
 
     }
 
-    protected Atributo llaveMySQL(AccesoDatosMy acc, String nombreBase, String nombreTabla) {
-
-        Atributo att = null;
-        ArrayList res = null;
+    public boolean isNullorEmpty(ArrayList arr) {
+        boolean res = false;
         try {
-            if (acc.conectar()) {
-                res = acc.ejecutarConsulta("SELECT COLUMN_NAME, DATA_TYPE, COLUMN_KEY FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '" + nombreBase + "' AND TABLE_NAME = '" + nombreTabla + "' and COLUMN_KEY IN('PRI', 'UNI')");
-                acc.desconectar();
+            if (arr == null || arr.isEmpty()) {
+                res = true;
+            } else {
+                res = false;
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            res = true;
         }
-        if (res != null) {
-            att = new Atributo();
-            att.setNombre("" + ((ArrayList) res.get(0)).get(0));
-            att.setTipo("" + ((ArrayList) res.get(0)).get(1));
-        }
-        return att;
-    }
-
-    public Atributo llavePostgres(AccesoDatosPG acc, String nombreBase, String nombreTabla) {
-
-        Atributo att = null;
-        ArrayList res = null;
-        try {
-            if (acc.conectar()) {
-                String q = "select nombre, data_type "
-                        + "from (SELECT column_name as nombre "
-                        + "FROM information_schema.key_column_usage "
-                        + "WHERE TABLE_NAME='" + nombreTabla + "' "
-                        + "AND TABLE_CATALOG='" + nombreBase + "') as a "
-                        + "join INFORMATION_SCHEMA.COLUMNS "
-                        + "on INFORMATION_SCHEMA.COLUMNS.COLUMN_NAME=nombre "
-                        + "where INFORMATION_SCHEMA.COLUMNS.TABLE_NAME='" + nombreTabla + "' "
-                        + "and INFORMATION_SCHEMA.COLUMNS.TABLE_CATALOG='" + nombreBase + "';";
-                res = acc.ejecutarConsulta(q);
-                acc.desconectar();
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        if (res != null) {
-            att = new Atributo();
-            att.setNombre("" + ((ArrayList) res.get(0)).get(0));
-            att.setTipo("" + ((ArrayList) res.get(0)).get(1));
-        }
-        return att;
+        return res;
     }
 }
