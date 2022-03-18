@@ -50,7 +50,7 @@ public class Vigilante {
             if (accesoXamana.conectar()) {
                 res = accesoXamana.ejecutarConsulta("select bd.nombre, direccion, puerto, gestor, usr, psw, "
                         + "Tabla.nombre, Tabla.umbral_op, Tabla.umbral_des from bd "
-                        + "join tabla on tabla.id_BD=bd.id_BD "
+                        + "join Tabla on Tabla.id_BD=bd.id_BD "
                         + "join fragmento on fragmento.id_tabla=tabla.id_tabla "
                         + "where fragmento.id_tabla=" + token);
                 accesoXamana.desconectar();

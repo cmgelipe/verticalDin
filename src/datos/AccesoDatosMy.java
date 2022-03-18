@@ -19,15 +19,15 @@ import java.util.logging.Logger;
  */
 public class AccesoDatosMy extends AccesoDatos implements Serializable {
 
-    public static String sUrl = null;
+    public String sUrl = null;
     public static String sUsr = null;
     public static String sPwd = null;
     private java.sql.Connection oConexion;
 
     public AccesoDatosMy() throws Exception {
-        sUrl = "jdbc:mysql://192.168.200.5/xamana?useSSL=false&serverTimezone=UTC";
+        sUrl = "jdbc:mysql://localhost/xamana?useSSL=false&serverTimezone=UTC";
         sUsr = "root";
-        sPwd = "Sunny_4teamo";
+        sPwd = "1122";
     }
     
     public AccesoDatosMy(String url, String nombd, String usr, String pwd) throws Exception {

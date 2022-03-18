@@ -22,6 +22,7 @@ public class Fragmentador {
 
     private AccesoDatos origen;
     private AccesoDatos destino;
+    AccesoDatosMy xamanaAcc;
     private ArrayList<Atributo> atts;
     private BD datosBD;
     int nFragmento;
@@ -135,7 +136,21 @@ public class Fragmentador {
                     }
                     accDestino.desconectar();
                 }
+                //Registrar datos en xamana
+                //Modificar tabla fragmento,agregando isCBIR 
+                xamanaAcc=new AccesoDatosMy();
+                if(xamanaAcc.conectar()){
+                    xamanaAcc.ejecutarComando("insert into Fragmento(nombre, id_tabla, id_sitio, noperaciones, ndesempenio) value ('"
+                            +this.datosBD.getTabla().getNombre() + "_f" + this.nFragmento +"', "+this.datosBD.getTabla().getIdTabla()
+                            +", "+((AccesoDatosMy)this.destino).sUrl.split(":")[0]+")");
+                    xamanaAcc.desconectar();
+                          
+                }
+                //Eliminar atributos en tabla original
+                
+                
             }
+            
         } catch (Exception e) {
             e.printStackTrace();
         }
