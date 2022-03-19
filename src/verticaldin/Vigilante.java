@@ -333,7 +333,7 @@ public class Vigilante {
                                     Atributo att1 = new Atributo(nombre, att.split(":")[1], att.split(":")[1], (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false);
                                     Atributo att2 = new Atributo("" + ((ArrayList) res.get(0)).get(0), "" + ((ArrayList) res.get(0)).get(1), "" + ((ArrayList) res.get(0)).get(2), (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false);
                                     ArrayList<Atributo> atributos = new ArrayList<>(Arrays.asList(this.datosBD.getTabla().getAtributoLlave(),att1, att2));
-                                    Fragmentador f = new Fragmentador(accO, accD, atributos, this.datosBD,this.numeroFragmento++);
+                                    Fragmentador f = new Fragmentador(accO, accD, atributos, this.datosBD,this.numeroFragmento++,true);
                                 }
                             }
                         } else {

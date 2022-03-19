@@ -122,7 +122,7 @@ public class Tabla {
             ArrayList res = null;
             if (accesoXamana.conectar()) {
                 //¿Que fragmentos estan en el sitio a donde el vigilante esta?
-                res = accesoXamana.ejecutarConsulta("select nombre, noperaciones, ndesempenio, cbir from fragmento "
+                res = accesoXamana.ejecutarConsulta("select nombre, noperaciones, ndesempenio, isCBIR from fragmento "
                         + "join sitio on sitio.id_sitio=fragmento.id_sitio where id_tabla=" + this.idTabla + " "
                         + "and direccion='" + ip + "'");
                 accesoXamana.desconectar();

@@ -26,13 +26,29 @@ public class Fragmentador {
     private ArrayList<Atributo> atts;
     private BD datosBD;
     int nFragmento;
+    boolean fragmentacionCBIR;
+    double noperaciones;
+    double ndesempenio;
 
-    public Fragmentador(AccesoDatos origen, AccesoDatos destino, ArrayList<Atributo> atts, BD datosBD, int nFragmento) {
+    public Fragmentador(AccesoDatos origen, AccesoDatos destino, ArrayList<Atributo> atts, BD datosBD, int nFragmento, boolean CBIR) {
         this.setOrigen(origen);
         this.setDestino(destino);
         this.setAtts(atts);
         this.datosBD = datosBD;
         this.nFragmento = nFragmento;
+        this.fragmentacionCBIR = CBIR;
+    }
+
+    public Fragmentador(AccesoDatos origen, AccesoDatos destino, ArrayList<Atributo> atts, BD datosBD, int nFragmento, boolean CBIR, double noperaciones, double ndesempenio) {
+        //Cuando no es CBIR tiene valores en ndesempenio y noperaciones
+        this.setOrigen(origen);
+        this.setDestino(destino);
+        this.setAtts(atts);
+        this.datosBD = datosBD;
+        this.nFragmento = nFragmento;
+        this.fragmentacionCBIR = CBIR;
+        this.ndesempenio = ndesempenio;
+        this.noperaciones = noperaciones;
     }
 
     public boolean generarFragmentos() {
@@ -123,34 +139,42 @@ public class Fragmentador {
                     //agregar datos
                     for (int i = 0; i < arr.size(); i++) {
                         String valores = "";
-                        for (int j=0; j < ((ArrayList) arr.get(0)).size(); j++) {
+                        for (int j = 0; j < ((ArrayList) arr.get(0)).size(); j++) {
                             if (this.transTipoDato(this.getAtts().get(j).getTipo()) == 0 || this.transTipoDato(this.getAtts().get(j).getTipo()) == 2) {
                                 valores += "\"" + ((ArrayList) arr.get(i)).get(j) + "\", ";
                             } else {
                                 valores += ((ArrayList) arr.get(i)).get(j) + ", ";
                             }
                             valores = valores.substring(0, valores.length() - 2);
-                            String q = "INSERT INTO " + this.datosBD.getTabla().getNombre() + "_f" + this.nFragmento+ " VALUES (" + valores + ");";
+                            String q = "INSERT INTO " + this.datosBD.getTabla().getNombre() + "_f" + this.nFragmento + " VALUES (" + valores + ");";
                             accDestino.ejecutarComando(q);
                         }
                     }
                     accDestino.desconectar();
                 }
                 //Registrar datos en xamana
-                //Modificar tabla fragmento,agregando isCBIR 
-                xamanaAcc=new AccesoDatosMy();
-                if(xamanaAcc.conectar()){
-                    xamanaAcc.ejecutarComando("insert into Fragmento(nombre, id_tabla, id_sitio, noperaciones, ndesempenio) value ('"
-                            +this.datosBD.getTabla().getNombre() + "_f" + this.nFragmento +"', "+this.datosBD.getTabla().getIdTabla()
-                            +", "+((AccesoDatosMy)this.destino).sUrl.split(":")[0]+")");
+
+                xamanaAcc = new AccesoDatosMy();
+                if (xamanaAcc.conectar()) {
+                    if (this.fragmentacionCBIR) {
+                        xamanaAcc.ejecutarComando("insert into Fragmento(nombre, id_tabla, id_sitio, noperaciones, ndesempenio, isCBIR) value ('"
+                                + this.datosBD.getTabla().getNombre() + "_f" + this.nFragmento + "', " + this.datosBD.getTabla().getIdTabla()
+                                + ", " + ((AccesoDatosMy) this.destino).sUrl.split(":")[0] + ",0,0,1)");
+
+                    } else {
+                        xamanaAcc.ejecutarComando("insert into Fragmento(nombre, id_tabla, id_sitio, noperaciones, ndesempenio, isCBIR) value ('"
+                                + this.datosBD.getTabla().getNombre() + "_f" + this.nFragmento + "', " + this.datosBD.getTabla().getIdTabla()
+                                + ", " + ((AccesoDatosMy) this.destino).sUrl.split(":")[0] + "," + this.noperaciones + "," + this.ndesempenio + ",0)");
+                    }
+                    //Registrar atributos en xamana
+                    
                     xamanaAcc.desconectar();
-                          
+
                 }
                 //Eliminar atributos en tabla original
-                
-                
+
             }
-            
+
         } catch (Exception e) {
             e.printStackTrace();
         }
