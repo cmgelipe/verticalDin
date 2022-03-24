@@ -18,6 +18,7 @@ public class Fragmento {
     private double noperaciones;
     private double ndesempenio;
     private boolean cbir;
+    private ArrayList<Atributo> atributos;
 
     /**
      * @return the nombre
@@ -113,6 +114,20 @@ public class Fragmento {
             e.printStackTrace();
         }
         return res;
+    }
+
+    /**
+     * @return the atributos
+     */
+    public ArrayList<Atributo> getAtributos() {
+        return atributos;
+    }
+
+    /**
+     * @param atributos the atributos to set
+     */
+    public void setAtributos(ArrayList<Atributo> atributos) {
+        this.atributos = atributos;
     }
     
 }

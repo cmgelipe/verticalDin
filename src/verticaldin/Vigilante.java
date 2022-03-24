@@ -39,13 +39,16 @@ public class Vigilante {
     long caracterLog;
     String dirLogs;
     int numeroFragmento;
-
+    estadoHilo hilo;
+    
     public Vigilante(String token, String DirLogs) {
         this.dirLogs = DirLogs;
         this.token = token;
+        hilo=new estadoHilo();
         miIP = this.getIP();
         try {
             ArrayList res = null;
+            ArrayList res3 = null;
             accesoXamana = new AccesoDatosMy();
             if (accesoXamana.conectar()) {
                 res = accesoXamana.ejecutarConsulta("select bd.nombre, direccion, puerto, gestor, usr, psw, "
@@ -53,11 +56,12 @@ public class Vigilante {
                         + "join Tabla on Tabla.id_BD=bd.id_BD "
                         + "join fragmento on fragmento.id_tabla=tabla.id_tabla "
                         + "where fragmento.id_tabla=" + token);
+                res3=accesoXamana.ejecutarConsulta("select id_atributo, tipo, size,nom, descriptor, multimedia from Atributo where id_tabla="+token+"");
                 accesoXamana.desconectar();
             } else {
                 System.out.println("Sin conexión");
             }
-            if (!isNullorEmpty(res)) {
+            if (!isNullorEmpty(res) && !this.isNullorEmpty(res3)) {
                 System.out.println("Datos encontrados");
                 this.datosBD.setNombd("" + ((ArrayList) res.get(0)).get(0));
                 this.datosBD.setDirbd("" + ((ArrayList) res.get(0)).get(1));
@@ -65,11 +69,27 @@ public class Vigilante {
                 this.datosBD.setTipoBD("" + ((ArrayList) res.get(0)).get(3));
                 this.datosBD.setUsubd("" + ((ArrayList) res.get(0)).get(4));
                 this.datosBD.setPassbd("" + ((ArrayList) res.get(0)).get(5));
-                Tabla tabla=new Tabla();
+                Tabla tabla = new Tabla();
                 tabla.setIdTabla(token);
                 tabla.setNombre("" + ((ArrayList) res.get(0)).get(6));
                 tabla.setUmbralOP(Integer.parseInt("" + ((ArrayList) res.get(0)).get(7)));
                 tabla.setUmbralCO(Integer.parseInt("" + ((ArrayList) res.get(0)).get(8)));
+                
+                //buscar Atributos de tabla y agregarlos a la tabla
+                ArrayList<Atributo> attTabla=new ArrayList<>();
+                for(int k=0;k<res3.size();k++){
+                    Atributo a=new Atributo();
+                    a.setIdAtributo(""+((ArrayList)res3.get(k)).get(0));
+                    a.setTipo(""+((ArrayList)res3.get(k)).get(1));
+                    a.setTamanio(""+((ArrayList)res3.get(k)).get(2));
+                    a.setNombre(""+((ArrayList)res3.get(k)).get(3));
+                    boolean d=((""+((ArrayList)res3.get(k)).get(4)).compareTo("0")==0)?false:true;
+                    a.setDescriptor(d);
+                    d=((""+((ArrayList)res3.get(k)).get(5)).compareTo("0")==0)?false:true;
+                    a.setMultimedia(d);
+                    attTabla.add(a);
+                }
+                tabla.setAtributos(attTabla);
                 tabla.llenaFragmentosxSitio(miIP);
                 this.datosBD.setTabla(tabla);
                 //Análisis de logs para detectar nuevos atributos (alter table add column), comparar atributos de base de xamana
@@ -78,33 +98,40 @@ public class Vigilante {
                 //Si no es ninguno de esos dos, entonces dejarlo en la tabla original.
                 //Analizar si algun fragmento superó umbrales (incluida la tabla inicial)) mediante el analisis del log
                 //MODIFICAR BASE DE DATOS XAMANA, agregando en atributo EL CAMPO cbir
-                boolean banderaRefragmentacion = false;
                 if (this.datosBD.getTipoBD().compareTo("a") == 0) {
                     //MYSQL
 
                     //¿Es el servidor original?
                     if (this.datosBD.getDirbd().compareTo(this.getIP()) == 0) {
+                        //Abro socket
+                        
+                        hilo.start();
                         while (true) {
                             //La bandera de refragmentación indica cuando los fragmentos a analizar en los logs ya no son los mismos y es necesario 
                             //llenar nuevamente con los nuevos fragmentos que se analizaran.
-                            if (banderaRefragmentacion) {
+                            if (hilo.banderaRefragmentacion) {
                                 this.datosBD.getTabla().llenaFragmentosxSitio(miIP);
-                                banderaRefragmentacion = false;
+                                hilo.banderaRefragmentacion = false;
                             }
-                            //revisar agregado de atributos
+                            //revisar agregado de atributos solo en servidor original
                             nuevosAtributos();
-                            logMySQL();
+                            //logMySQL();
                             Thread.sleep(300000);
                         }
-                    }else{
+                    } else {
+                        //Abro socket
+                        estadoHilo hilo=new estadoHilo();
+                        hilo.start();
                         while (true) {
                             //La bandera de refragmentación indica cuando los fragmentos a analizar en los logs ya no son los mismos y es necesario 
                             //llenar nuevamente con los nuevos fragmentos que se analizaran.
-                            if (banderaRefragmentacion) {
+                            if (hilo.banderaRefragmentacion) {
                                 this.datosBD.getTabla().llenaFragmentosxSitio(miIP);
-                                banderaRefragmentacion = false;
+                                hilo.banderaRefragmentacion = false;
                             }
-                            logMySQL();
+                            //revisar eliminado de atributos, solo para servidores secundarios
+                            eliminadoAtributos();
+                            //logMySQL();
                             Thread.sleep(300000);
                         }
                     }
@@ -136,6 +163,10 @@ public class Vigilante {
         return res;
     }
 
+    public boolean isNullorEmpty(String s) {
+        return (s != null) ? ((!s.isEmpty()) ? false : true) : true;
+    }
+
     protected String getIP() {
         String ip = "";
         try {
@@ -164,7 +195,7 @@ public class Vigilante {
     }
 
     private void logMySQL() {
-        
+
         try {
             RandomAccessFile raf = new RandomAccessFile(this.dirLogs, "r");
             raf.seek(this.caracterLog);
@@ -264,12 +295,12 @@ public class Vigilante {
         }
         return IPmasOcupada;
     }
-    
+
     // Solo para servidor original (nodos no deben modificar sus atributos directamente)
     public void nuevosAtributos() {
         try {
             //Buscar si atributos en tabla original estan registrados en xamana
-            AccesoDatosMy accExterno = new AccesoDatosMy(this.datosBD.getDirbd()+":"+this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+            AccesoDatosMy accExterno = new AccesoDatosMy(this.datosBD.getDirbd() + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
             ArrayList<String> atts = null;
             if (accExterno.conectar()) {
                 atts = accExterno.atributos(this.datosBD.getNombd(), this.datosBD.getTabla().getNombre());
@@ -300,44 +331,50 @@ public class Vigilante {
                                 ArrayList res = null;
                                 if (accesoXamana.conectar()) {
                                     if (rbtn1.isSelected()) {
-                                        res = accesoXamana.ejecutarConsulta("select nom, tipo, size from Atributo where multimedia=1 and id_tabla=" + this.token);
+                                        res = accesoXamana.ejecutarConsulta("select id_atributo, nom, tipo, size from Atributo where multimedia=1 and id_tabla=" + this.token);
                                     } else if (rbtn2.isSelected()) {
-                                        res = accesoXamana.ejecutarConsulta("select nom, tipo, size from Atributo where descriptor=1 and id_tabla=" + this.token);
+                                        res = accesoXamana.ejecutarConsulta("select id_atributo, nom, tipo, size from Atributo where descriptor=1 and id_tabla=" + this.token);
                                     }
                                     accesoXamana.desconectar();
                                 }
                                 if (!this.isNullorEmpty(res)) {
                                     //registrar atributo en xamana
                                     int t = 0;
+                                    String idAtributo = "";
                                     if (this.accesoXamana.conectar()) {
                                         if (rbtn1.isSelected()) {
-                                            t = this.accesoXamana.ejecutarComando("insert into atributo (tipo,size,nom,descriptor,multimedia,id_tabla) values ('" + att.split(":")[1] + "'," + att.split(":")[2] + ",'" + att.split(":")[0] + "'," + 1 + "," + 0 + "," + this.token + ")");
+                                            t = this.accesoXamana.ejecutarComando("insert into Atributo (tipo,size,nom,descriptor,multimedia,id_tabla) values ('" + att.split(":")[1] + "'," + att.split(":")[2] + ",'" + att.split(":")[0] + "'," + 1 + "," + 0 + "," + this.token + ")");
+                                            idAtributo = "" + ((ArrayList) this.accesoXamana.ejecutarConsulta("Select LAST_INSERT_ID()").get(0)).get(0);
                                         } else if (rbtn2.isSelected()) {
-                                            t = this.accesoXamana.ejecutarComando("insert into atributo (tipo,size,nom,descriptor,multimedia,id_tabla) values ('" + att.split(":")[1] + "'," + att.split(":")[2] + ",'" + att.split(":")[0] + "'," + 0 + "," + 1 + "," + this.token + ")");
+                                            t = this.accesoXamana.ejecutarComando("insert into Atributo (tipo,size,nom,descriptor,multimedia,id_tabla) values ('" + att.split(":")[1] + "'," + att.split(":")[2] + ",'" + att.split(":")[0] + "'," + 0 + "," + 1 + "," + this.token + ")");
+                                            idAtributo = "" + ((ArrayList) this.accesoXamana.ejecutarConsulta("Select LAST_INSERT_ID()").get(0)).get(0);
+                                        }
+                                        if (t == 1 && !this.isNullorEmpty(idAtributo)) {
+                                            System.out.println("Atributo insertado");
+                                        } else {
+                                            System.out.println("Atributo no insertado");
                                         }
                                         this.accesoXamana.desconectar();
-                                    }
-                                    if (t == 1) {
-                                        System.out.println("Atributo insertado");
-                                    } else {
-                                        System.out.println("Atributo no insertado");
                                     }
                                     //buscar en log que sitio ocupó más estos atributos
                                     String sitio = buscaSitioXUsoAtributosMYSQL(nombre, "" + ((ArrayList) res.get(0)).get(0));
                                     //origen
-                                    AccesoDatosMy accO = new AccesoDatosMy(this.datosBD.getDirbd()+":"+this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+                                    AccesoDatosMy accO = new AccesoDatosMy(this.datosBD.getDirbd() + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
                                     //Destino
-                                    AccesoDatosMy accD = new AccesoDatosMy(sitio+":"+this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+                                    AccesoDatosMy accD = new AccesoDatosMy(sitio + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
                                     //Atributos
                                     this.datosBD.getTabla().setAtributoLlave(this.llaveMySQL(accO, this.datosBD.getNombd(), this.datosBD.getTabla().getNombre()));
-                                    Atributo att1 = new Atributo(nombre, att.split(":")[1], att.split(":")[1], (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false);
-                                    Atributo att2 = new Atributo("" + ((ArrayList) res.get(0)).get(0), "" + ((ArrayList) res.get(0)).get(1), "" + ((ArrayList) res.get(0)).get(2), (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false);
-                                    ArrayList<Atributo> atributos = new ArrayList<>(Arrays.asList(this.datosBD.getTabla().getAtributoLlave(),att1, att2));
-                                    Fragmentador f = new Fragmentador(accO, accD, atributos, this.datosBD,this.numeroFragmento++,true);
+                                    Atributo att1 = new Atributo(idAtributo,nombre, att.split(":")[1], att.split(":")[1], (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false);
+                                    Atributo att2 = new Atributo("" + ((ArrayList) res.get(0)).get(0),"" + ((ArrayList) res.get(0)).get(1), "" + ((ArrayList) res.get(0)).get(2), "" + ((ArrayList) res.get(0)).get(3), (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false);
+                                    ArrayList<Atributo> atributos = new ArrayList<>(Arrays.asList(this.datosBD.getTabla().getAtributoLlave(), att1, att2));
+                                    
+                                    Fragmentador f = new Fragmentador(accO, accD, atributos, this.datosBD, this.numeroFragmento++, true);
+                                    f.generarFragmentos();
+                                    
                                 }
                             }
                         } else {
-                            //atributo normal
+                            //atributo normal, no hacer nada, se debe analizar el log
                         }
                     }
                 }
@@ -377,7 +414,8 @@ public class Vigilante {
         }
         return att;
     }
-     protected Atributo llaveMySQL(AccesoDatosMy acc, String nombreBase, String nombreTabla) {
+
+    protected Atributo llaveMySQL(AccesoDatosMy acc, String nombreBase, String nombreTabla) {
 
         Atributo att = null;
         ArrayList res = null;
@@ -395,5 +433,9 @@ public class Vigilante {
             att.setTipo("" + ((ArrayList) res.get(0)).get(1));
         }
         return att;
+    }
+
+    private void eliminadoAtributos() {
+        
     }
 }

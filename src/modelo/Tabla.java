@@ -11,6 +11,7 @@ import java.util.List;
  * @author pipe
  */
 public class Tabla {
+
     private String nombre;
     private int umbralOP;
     private int umbralCO;
@@ -89,63 +90,85 @@ public class Tabla {
     public void setIdTabla(String idTabla) {
         this.idTabla = idTabla;
     }
-    
-    public void obtenerAtributos(){
-        try{
-            AccesoDatosMy acc=new AccesoDatosMy();
-            ArrayList arr=null;
-            if(acc.conectar()){
-                arr=acc.ejecutarConsulta("select nom, tipo, size, descriptor, multimedia from atributo "
+
+    public void obtenerAtributos() {
+        try {
+            AccesoDatosMy acc = new AccesoDatosMy();
+            ArrayList arr = null;
+            if (acc.conectar()) {
+                arr = acc.ejecutarConsulta("select nom, tipo, size, descriptor, multimedia from atributo "
                         + "join fragmento on fragmento.id_fragmento=atributo.id_fragmento "
-                        + "where fragmento.id_tabla="+this.idTabla);
+                        + "where fragmento.id_tabla=" + this.idTabla);
                 acc.desconectar();
             }
-            if(arr!=null){
+            if (arr != null) {
                 this.setAtributos(new ArrayList<>());
-                for(int i=0;i<arr.size();i++){
-                    Atributo att=new Atributo();
-                    att.setNombre(""+((ArrayList)arr.get(i)).get(0));
-                    att.setTipo(""+((ArrayList)arr.get(i)).get(1));
-                    att.setTamanio(""+((ArrayList)arr.get(i)).get(2));
-                    att.setDescriptor(Boolean.parseBoolean(""+((ArrayList)arr.get(i)).get(3)));
-                    att.setMultimedia(Boolean.parseBoolean(""+((ArrayList)arr.get(i)).get(4)));
+                for (int i = 0; i < arr.size(); i++) {
+                    Atributo att = new Atributo();
+                    att.setNombre("" + ((ArrayList) arr.get(i)).get(0));
+                    att.setTipo("" + ((ArrayList) arr.get(i)).get(1));
+                    att.setTamanio("" + ((ArrayList) arr.get(i)).get(2));
+                    att.setDescriptor(Boolean.parseBoolean("" + ((ArrayList) arr.get(i)).get(3)));
+                    att.setMultimedia(Boolean.parseBoolean("" + ((ArrayList) arr.get(i)).get(4)));
                     this.getAtributos().add(att);
                 }
             }
-        }catch(Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
+
     public void llenaFragmentosxSitio(String ip) {
         try {
             accesoXamana = new AccesoDatosMy();
             ArrayList res = null;
+            ArrayList res3 = null;
             if (accesoXamana.conectar()) {
                 //¿Que fragmentos estan en el sitio a donde el vigilante esta?
-                res = accesoXamana.ejecutarConsulta("select nombre, noperaciones, ndesempenio, isCBIR from fragmento "
+                res = accesoXamana.ejecutarConsulta("select id_fragmento, nombre, noperaciones, ndesempenio, isCBIR from fragmento "
                         + "join sitio on sitio.id_sitio=fragmento.id_sitio where id_tabla=" + this.idTabla + " "
                         + "and direccion='" + ip + "'");
+                if (!isNullorEmpty(res)) {
+                    System.out.println("Fragmentos encontrados");
+                    setFragmentos(new ArrayList<>());
+                    for (Object tupla : res) {
+                        Fragmento f = new Fragmento();
+                        f.setId_fragmento("" + ((ArrayList) tupla).get(0));
+                        f.setNombre("" + ((ArrayList) tupla).get(1));
+                        f.setNoperaciones(Double.parseDouble("" + ((ArrayList) tupla).get(2)));
+                        f.setNdesempenio(Double.parseDouble("" + ((ArrayList) tupla).get(3)));
+                        f.setCbir(Boolean.parseBoolean("" + ((ArrayList) tupla).get(4)));
+                        //buscar atributos de fragmento y agregarlos al fragmento
+                        res3 = accesoXamana.ejecutarConsulta("select id_atributo, tipo, size,nom, descriptor, multimedia from Atributo where id_fragmento=" + f.getId_fragmento() + "");
+                        ArrayList<Atributo> attsFragmento = new ArrayList<>();
+                        if (!this.isNullorEmpty(res3)) {
+                            for (int k = 0; k < res3.size(); k++) {
+                                Atributo a = new Atributo();
+                                a.setIdAtributo("" + ((ArrayList) res3.get(k)).get(0));
+                                a.setTipo("" + ((ArrayList) res3.get(k)).get(1));
+                                a.setTamanio("" + ((ArrayList) res3.get(k)).get(2));
+                                a.setNombre("" + ((ArrayList) res3.get(k)).get(3));
+                                boolean d = (("" + ((ArrayList) res3.get(k)).get(4)).compareTo("0") == 0) ? false : true;
+                                a.setDescriptor(d);
+                                d = (("" + ((ArrayList) res3.get(k)).get(5)).compareTo("0") == 0) ? false : true;
+                                a.setMultimedia(d);
+                                attsFragmento.add(a);
+                            }
+                        }
+                        f.setAtributos(attsFragmento);
+                        getFragmentos().add(f);
+                    }
+                }
                 accesoXamana.desconectar();
             } else {
                 System.out.println("Sin conexión");
-            }
-            if (!isNullorEmpty(res)) {
-                System.out.println("Fragmentos encontrados");
-                setFragmentos(new ArrayList<>());
-                for (Object tupla : res) {
-                    Fragmento f = new Fragmento();
-                    f.setNombre("" + ((ArrayList) tupla).get(0));
-                    f.setNoperaciones(Double.parseDouble("" + ((ArrayList) tupla).get(1)));
-                    f.setNdesempenio(Double.parseDouble("" + ((ArrayList) tupla).get(2)));
-                    f.setCbir(Boolean.parseBoolean("" + ((ArrayList) tupla).get(3)));
-                    getFragmentos().add(f);
-                }
             }
         } catch (Exception ex) {
             ex.printStackTrace();
         }
     }
-     public boolean isNullorEmpty(ArrayList arr) {
+
+    public boolean isNullorEmpty(ArrayList arr) {
         boolean res = false;
         try {
             if (arr == null || arr.isEmpty()) {

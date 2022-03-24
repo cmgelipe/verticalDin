@@ -10,6 +10,7 @@ package modelo;
  * @author pipe
  */
 public class Atributo {
+    private String idAtributo;
     private String nombre;
     private String tipo;
     private String tamanio;
@@ -19,12 +20,13 @@ public class Atributo {
     public Atributo(){
         
     }
-    public Atributo(String nombre, String tipo, String tamanio,boolean descriptor,boolean multimedia ){
+    public Atributo(String idAtributo, String nombre, String tipo, String tamanio,boolean descriptor,boolean multimedia ){
         this.setNombre(nombre);
         this.setTipo(tipo);
         this.setTamanio(tamanio);
         this.setDescriptor(descriptor);
         this.setMultimedia(multimedia);
+        this.idAtributo=idAtributo;
     }
     
     /**
@@ -95,6 +97,20 @@ public class Atributo {
      */
     public void setMultimedia(boolean multimedia) {
         this.multimedia = multimedia;
+    }
+
+    /**
+     * @return the idAtributo
+     */
+    public String getIdAtributo() {
+        return idAtributo;
+    }
+
+    /**
+     * @param idAtributo the idAtributo to set
+     */
+    public void setIdAtributo(String idAtributo) {
+        this.idAtributo = idAtributo;
     }
     
 }
