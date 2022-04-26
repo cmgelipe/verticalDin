@@ -31,7 +31,7 @@ public class AccesoDatosMy extends AccesoDatos implements Serializable {
     }
     
     public AccesoDatosMy(String url, String nombd, String usr, String pwd) throws Exception {
-        sUrl = "jdbc:mysql://"+url+"/"+nombd;//"jdbc:mysql://localhost/Master";
+        sUrl = "jdbc:mysql://"+url+"/"+nombd+"?autoReconnect=true&useSSL=false&serverTimezone=UTC";//"jdbc:mysql://localhost/Master";
         sUsr = usr;//"root";
         sPwd = pwd;//"sunny_4teamo";
     }

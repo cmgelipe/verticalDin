@@ -13,8 +13,8 @@ import java.util.List;
 public class Tabla {
 
     private String nombre;
-    private int umbralOP;
-    private int umbralCO;
+    private double umbralOP;
+    private double umbralCO;
     private Atributo atributoLlave;
     private String idTabla;
     private ArrayList<Fragmento> fragmentos = null;
@@ -38,28 +38,28 @@ public class Tabla {
     /**
      * @return the umbralOP
      */
-    public int getUmbralOP() {
+    public double getUmbralOP() {
         return umbralOP;
     }
 
     /**
      * @param umbralOP the umbralOP to set
      */
-    public void setUmbralOP(int umbralOP) {
+    public void setUmbralOP(double umbralOP) {
         this.umbralOP = umbralOP;
     }
 
     /**
      * @return the umbralCO
      */
-    public int getUmbralCO() {
+    public double getUmbralCO() {
         return umbralCO;
     }
 
     /**
      * @param umbralCO the umbralCO to set
      */
-    public void setUmbralCO(int umbralCO) {
+    public void setUmbralCO(double umbralCO) {
         this.umbralCO = umbralCO;
     }
 
@@ -125,8 +125,9 @@ public class Tabla {
             ArrayList res3 = null;
             if (accesoXamana.conectar()) {
                 //¿Que fragmentos estan en el sitio a donde el vigilante esta?
-                res = accesoXamana.ejecutarConsulta("select id_fragmento, nombre, noperaciones, ndesempenio, isCBIR from fragmento "
-                        + "join sitio on sitio.id_sitio=fragmento.id_sitio where id_tabla=" + this.idTabla + " "
+                res = accesoXamana.ejecutarConsulta("select id_fragmento, nombre, noperaciones, ndesempenio, isCBIR "
+                        + "from Fragmento "
+                        + "join Sitio on Sitio.id_sitio=Fragmento.id_sitio where id_tabla=" + this.idTabla + " "
                         + "and direccion='" + ip + "'");
                 if (!isNullorEmpty(res)) {
                     System.out.println("Fragmentos encontrados");
@@ -139,7 +140,9 @@ public class Tabla {
                         f.setNdesempenio(Double.parseDouble("" + ((ArrayList) tupla).get(3)));
                         f.setCbir(Boolean.parseBoolean("" + ((ArrayList) tupla).get(4)));
                         //buscar atributos de fragmento y agregarlos al fragmento
-                        res3 = accesoXamana.ejecutarConsulta("select id_atributo, tipo, size,nom, descriptor, multimedia from Atributo where id_fragmento=" + f.getId_fragmento() + "");
+                        res3 = accesoXamana.ejecutarConsulta("select id_atributo, tipo, size,nom, descriptor, multimedia "
+                                + "from Atributo "
+                                + "where id_fragmento=" + f.getId_fragmento() + "");
                         ArrayList<Atributo> attsFragmento = new ArrayList<>();
                         if (!this.isNullorEmpty(res3)) {
                             for (int k = 0; k < res3.size(); k++) {

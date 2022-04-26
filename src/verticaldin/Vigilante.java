@@ -25,6 +25,7 @@ import javax.swing.ButtonGroup;
 import javax.swing.JOptionPane;
 import javax.swing.JRadioButton;
 import modelo.Atributo;
+import modelo.Fragmento;
 
 /**
  *
@@ -40,29 +41,33 @@ public class Vigilante {
     String dirLogs;
     int numeroFragmento;
     estadoHilo hilo;
-    
+
     public Vigilante(String token, String DirLogs) {
         this.dirLogs = DirLogs;
         this.token = token;
-        hilo=new estadoHilo();
+
+        hilo = new estadoHilo();
         miIP = this.getIP();
         try {
             ArrayList res = null;
             ArrayList res3 = null;
             accesoXamana = new AccesoDatosMy();
             if (accesoXamana.conectar()) {
-                res = accesoXamana.ejecutarConsulta("select bd.nombre, direccion, puerto, gestor, usr, psw, "
-                        + "Tabla.nombre, Tabla.umbral_op, Tabla.umbral_des from bd "
-                        + "join Tabla on Tabla.id_BD=bd.id_BD "
-                        + "join fragmento on fragmento.id_tabla=tabla.id_tabla "
-                        + "where fragmento.id_tabla=" + token);
-                res3=accesoXamana.ejecutarConsulta("select id_atributo, tipo, size,nom, descriptor, multimedia from Atributo where id_tabla="+token+"");
+                res = accesoXamana.ejecutarConsulta("select BD.nombre, direccion, puerto, gestor, usr, psw, "
+                        + "Tabla.nombre, Tabla.umbral_op, Tabla.umbral_des from BD "
+                        + "join Tabla on Tabla.id_BD=BD.id_BD "
+                        + "join Fragmento on Fragmento.id_tabla=Tabla.id_tabla "
+                        + "where Fragmento.id_tabla=" + token);
+                res3 = accesoXamana.ejecutarConsulta("select id_atributo, tipo, size, nom, descriptor, multimedia "
+                        + "from Atributo "
+                        + "where Fragmento.id_tabla=" + token);
                 accesoXamana.desconectar();
             } else {
                 System.out.println("Sin conexión");
             }
             if (!isNullorEmpty(res) && !this.isNullorEmpty(res3)) {
                 System.out.println("Datos encontrados");
+                this.datosBD = new BD();
                 this.datosBD.setNombd("" + ((ArrayList) res.get(0)).get(0));
                 this.datosBD.setDirbd("" + ((ArrayList) res.get(0)).get(1));
                 this.datosBD.setPortbd("" + ((ArrayList) res.get(0)).get(2));
@@ -72,20 +77,20 @@ public class Vigilante {
                 Tabla tabla = new Tabla();
                 tabla.setIdTabla(token);
                 tabla.setNombre("" + ((ArrayList) res.get(0)).get(6));
-                tabla.setUmbralOP(Integer.parseInt("" + ((ArrayList) res.get(0)).get(7)));
-                tabla.setUmbralCO(Integer.parseInt("" + ((ArrayList) res.get(0)).get(8)));
-                
+                tabla.setUmbralOP(Double.parseDouble("" + ((ArrayList) res.get(0)).get(7)));
+                tabla.setUmbralCO(Double.parseDouble("" + ((ArrayList) res.get(0)).get(8)));
+
                 //buscar Atributos de tabla y agregarlos a la tabla
-                ArrayList<Atributo> attTabla=new ArrayList<>();
-                for(int k=0;k<res3.size();k++){
-                    Atributo a=new Atributo();
-                    a.setIdAtributo(""+((ArrayList)res3.get(k)).get(0));
-                    a.setTipo(""+((ArrayList)res3.get(k)).get(1));
-                    a.setTamanio(""+((ArrayList)res3.get(k)).get(2));
-                    a.setNombre(""+((ArrayList)res3.get(k)).get(3));
-                    boolean d=((""+((ArrayList)res3.get(k)).get(4)).compareTo("0")==0)?false:true;
+                ArrayList<Atributo> attTabla = new ArrayList<>();
+                for (int k = 0; k < res3.size(); k++) {
+                    Atributo a = new Atributo();
+                    a.setIdAtributo("" + ((ArrayList) res3.get(k)).get(0));
+                    a.setTipo("" + ((ArrayList) res3.get(k)).get(1));
+                    a.setTamanio("" + ((ArrayList) res3.get(k)).get(2));
+                    a.setNombre("" + ((ArrayList) res3.get(k)).get(3));
+                    boolean d = (("" + ((ArrayList) res3.get(k)).get(4)).compareTo("0") == 0) ? false : true;
                     a.setDescriptor(d);
-                    d=((""+((ArrayList)res3.get(k)).get(5)).compareTo("0")==0)?false:true;
+                    d = (("" + ((ArrayList) res3.get(k)).get(5)).compareTo("0") == 0) ? false : true;
                     a.setMultimedia(d);
                     attTabla.add(a);
                 }
@@ -100,11 +105,9 @@ public class Vigilante {
                 //MODIFICAR BASE DE DATOS XAMANA, agregando en atributo EL CAMPO cbir
                 if (this.datosBD.getTipoBD().compareTo("a") == 0) {
                     //MYSQL
-
                     //¿Es el servidor original?
                     if (this.datosBD.getDirbd().compareTo(this.getIP()) == 0) {
                         //Abro socket
-                        
                         hilo.start();
                         while (true) {
                             //La bandera de refragmentación indica cuando los fragmentos a analizar en los logs ya no son los mismos y es necesario 
@@ -120,7 +123,6 @@ public class Vigilante {
                         }
                     } else {
                         //Abro socket
-                        estadoHilo hilo=new estadoHilo();
                         hilo.start();
                         while (true) {
                             //La bandera de refragmentación indica cuando los fragmentos a analizar en los logs ya no son los mismos y es necesario 
@@ -135,7 +137,6 @@ public class Vigilante {
                             Thread.sleep(300000);
                         }
                     }
-
                 } else if (this.datosBD.getTipoBD().compareTo("b") == 0 || this.datosBD.getTipoBD().compareTo("c") == 0) {
                     //POSTGRES
                 } else {
@@ -364,13 +365,12 @@ public class Vigilante {
                                     AccesoDatosMy accD = new AccesoDatosMy(sitio + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
                                     //Atributos
                                     this.datosBD.getTabla().setAtributoLlave(this.llaveMySQL(accO, this.datosBD.getNombd(), this.datosBD.getTabla().getNombre()));
-                                    Atributo att1 = new Atributo(idAtributo,nombre, att.split(":")[1], att.split(":")[1], (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false);
-                                    Atributo att2 = new Atributo("" + ((ArrayList) res.get(0)).get(0),"" + ((ArrayList) res.get(0)).get(1), "" + ((ArrayList) res.get(0)).get(2), "" + ((ArrayList) res.get(0)).get(3), (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false);
+                                    Atributo att1 = new Atributo(idAtributo, nombre, att.split(":")[1], att.split(":")[1], (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false);
+                                    Atributo att2 = new Atributo("" + ((ArrayList) res.get(0)).get(0), "" + ((ArrayList) res.get(0)).get(1), "" + ((ArrayList) res.get(0)).get(2), "" + ((ArrayList) res.get(0)).get(3), (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false);
                                     ArrayList<Atributo> atributos = new ArrayList<>(Arrays.asList(this.datosBD.getTabla().getAtributoLlave(), att1, att2));
-                                    
-                                    Fragmentador f = new Fragmentador(accO, accD, atributos, this.datosBD, this.numeroFragmento++, true);
-                                    f.generarFragmentos();
-                                    
+
+                                    Fragmentador frag = new Fragmentador(accO, accD, atributos, this.datosBD, this.numeroFragmento++, true);
+                                    frag.generarFragmentos();
                                 }
                             }
                         } else {
@@ -381,6 +381,7 @@ public class Vigilante {
             } else {
                 System.out.println("Alguien borró los atributos de la tabla recientemente");
             }
+
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -436,6 +437,31 @@ public class Vigilante {
     }
 
     private void eliminadoAtributos() {
-        
+        try {
+            for (Fragmento f : this.datosBD.getTabla().getFragmentos()) {
+                //buscar si atributos en xamana no estan presentes (eliminados) en ESTE NODO (no en el servidor principal)
+                AccesoDatosMy accExterno = new AccesoDatosMy(this.datosBD.getDirbd() + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+                ArrayList<String> atributosEnFragmento = new ArrayList<String>();
+                if (accExterno.conectar()) {
+                    atributosEnFragmento = accExterno.atributos(this.datosBD.getNombd(), f.getNombre());
+                    accExterno.desconectar();
+                }
+                if (!this.isNullorEmpty(atributosEnFragmento)) {
+                    for (Atributo a : f.getAtributos()) {
+                        if (!atributosEnFragmento.contains(a.getNombre())) {
+                            //Se eliminó. ahora se requiere eliminar ese atributo en xamana
+                            AccesoDatosMy xamana = new AccesoDatosMy();
+                            if (xamana.conectar()) {
+                                xamana.ejecutarComando("delete from Atributo where id_atributo=" + a.getIdAtributo());
+                                xamana.desconectar();
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
     }
 }
