@@ -16,6 +16,7 @@ public class Atributo {
     private String tamanio;
     private boolean descriptor;
     private boolean multimedia;
+    private boolean pk;
     
     public Atributo(){
         
@@ -111,6 +112,20 @@ public class Atributo {
      */
     public void setIdAtributo(String idAtributo) {
         this.idAtributo = idAtributo;
+    }
+
+    /**
+     * @return the pk
+     */
+    public boolean isPk() {
+        return pk;
+    }
+
+    /**
+     * @param pk the pk to set
+     */
+    public void setPk(boolean pk) {
+        this.pk = pk;
     }
     
 }

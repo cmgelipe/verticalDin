@@ -14,13 +14,10 @@ import java.io.RandomAccessFile;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
-import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.swing.ButtonGroup;
 import javax.swing.JOptionPane;
 import javax.swing.JRadioButton;
@@ -45,11 +42,11 @@ public class Vigilante {
     public Vigilante(String token, String DirLogs) {
         this.dirLogs = DirLogs;
         this.token = token;
-
         hilo = new estadoHilo();
         miIP = this.getIP();
         try {
             ArrayList res = null;
+            ArrayList res2 = null;
             ArrayList res3 = null;
             accesoXamana = new AccesoDatosMy();
             if (accesoXamana.conectar()) {
@@ -58,14 +55,18 @@ public class Vigilante {
                         + "join Tabla on Tabla.id_BD=BD.id_BD "
                         + "join Fragmento on Fragmento.id_tabla=Tabla.id_tabla "
                         + "where Fragmento.id_tabla=" + token);
-                res3 = accesoXamana.ejecutarConsulta("select id_atributo, tipo, size, nom, descriptor, multimedia "
+                res3 = accesoXamana.ejecutarConsulta("select id_atributo, tipo, size, nom, descriptor, multimedia"
                         + "from Atributo "
-                        + "where Fragmento.id_tabla=" + token);
+                        + "join Fragmento on Fragmento.id_fragmento=Atributo.id_fragmento "
+                        + "where Fragmento.id_tabla=" + token + " and Atributo.pk!=0");
+                res2 = accesoXamana.ejecutarConsulta("select id_atributo, tipo, size, nom, descriptor, multimedia"
+                        + "from Atributo "
+                        + "where Atributo.id_tabla=" + token + " and Atributo.pk=1");
                 accesoXamana.desconectar();
             } else {
                 System.out.println("Sin conexión");
             }
-            if (!isNullorEmpty(res) && !this.isNullorEmpty(res3)) {
+            if (!isNullorEmpty(res) && !this.isNullorEmpty(res2) && !this.isNullorEmpty(res3)) {
                 System.out.println("Datos encontrados");
                 this.datosBD = new BD();
                 this.datosBD.setNombd("" + ((ArrayList) res.get(0)).get(0));
@@ -82,18 +83,25 @@ public class Vigilante {
 
                 //buscar Atributos de tabla y agregarlos a la tabla
                 ArrayList<Atributo> attTabla = new ArrayList<>();
+                Atributo pk = new Atributo();
+                pk.setIdAtributo(""+((ArrayList)res2.get(0)).get(0));
+                pk.setTipo(""+((ArrayList)res2.get(0)).get(1));
+                pk.setTamanio(""+((ArrayList)res2.get(0)).get(2));
+                pk.setNombre(""+((ArrayList)res2.get(0)).get(3));
+                pk.setDescriptor(false);
+                pk.setMultimedia(false);
+                pk.setPk(true);
                 for (int k = 0; k < res3.size(); k++) {
                     Atributo a = new Atributo();
                     a.setIdAtributo("" + ((ArrayList) res3.get(k)).get(0));
                     a.setTipo("" + ((ArrayList) res3.get(k)).get(1));
                     a.setTamanio("" + ((ArrayList) res3.get(k)).get(2));
                     a.setNombre("" + ((ArrayList) res3.get(k)).get(3));
-                    boolean d = (("" + ((ArrayList) res3.get(k)).get(4)).compareTo("0") == 0) ? false : true;
-                    a.setDescriptor(d);
-                    d = (("" + ((ArrayList) res3.get(k)).get(5)).compareTo("0") == 0) ? false : true;
-                    a.setMultimedia(d);
+                    a.setDescriptor((("" + ((ArrayList) res3.get(k)).get(4)).compareTo("0") != 0));
+                    a.setMultimedia((("" + ((ArrayList) res3.get(k)).get(5)).compareTo("0") != 0));
                     attTabla.add(a);
                 }
+                tabla.setAtributoLlave(pk);
                 tabla.setAtributos(attTabla);
                 tabla.llenaFragmentosxSitio(miIP);
                 this.datosBD.setTabla(tabla);
