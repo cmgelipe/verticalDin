@@ -50,18 +50,24 @@ public class Vigilante {
             ArrayList res3 = null;
             accesoXamana = new AccesoDatosMy();
             if (accesoXamana.conectar()) {
-                res = accesoXamana.ejecutarConsulta("select BD.nombre, direccion, puerto, gestor, usr, psw, "
+                String sql = "select BD.nombre, direccion, puerto, gestor, usr, psw, "
                         + "Tabla.nombre, Tabla.umbral_op, Tabla.umbral_des from BD "
                         + "join Tabla on Tabla.id_BD=BD.id_BD "
                         + "join Fragmento on Fragmento.id_tabla=Tabla.id_tabla "
-                        + "where Fragmento.id_tabla=" + token);
-                res3 = accesoXamana.ejecutarConsulta("select id_atributo, tipo, size, nom, descriptor, multimedia"
+                        + "where Fragmento.id_tabla=" + token;
+
+                res = accesoXamana.ejecutarConsulta(sql);
+                sql = "select id_atributo, tipo, size, nom, descriptor, multimedia "
                         + "from Atributo "
                         + "join Fragmento on Fragmento.id_fragmento=Atributo.id_fragmento "
-                        + "where Fragmento.id_tabla=" + token + " and Atributo.pk!=0");
-                res2 = accesoXamana.ejecutarConsulta("select id_atributo, tipo, size, nom, descriptor, multimedia"
+                        + "where Fragmento.id_tabla=" + token + " and Atributo.pk=0";
+
+                res3 = accesoXamana.ejecutarConsulta(sql);
+                sql = "select id_atributo, tipo, size, nom, descriptor, multimedia "
                         + "from Atributo "
-                        + "where Atributo.id_tabla=" + token + " and Atributo.pk=1");
+                        + "where Atributo.id_tabla=" + token + " and Atributo.pk=1";
+
+                res2 = accesoXamana.ejecutarConsulta(sql);
                 accesoXamana.desconectar();
             } else {
                 System.out.println("Sin conexión");
@@ -84,10 +90,10 @@ public class Vigilante {
                 //buscar Atributos de tabla y agregarlos a la tabla
                 ArrayList<Atributo> attTabla = new ArrayList<>();
                 Atributo pk = new Atributo();
-                pk.setIdAtributo(""+((ArrayList)res2.get(0)).get(0));
-                pk.setTipo(""+((ArrayList)res2.get(0)).get(1));
-                pk.setTamanio(""+((ArrayList)res2.get(0)).get(2));
-                pk.setNombre(""+((ArrayList)res2.get(0)).get(3));
+                pk.setIdAtributo("" + ((ArrayList) res2.get(0)).get(0));
+                pk.setTipo("" + ((ArrayList) res2.get(0)).get(1));
+                pk.setTamanio("" + ((ArrayList) res2.get(0)).get(2));
+                pk.setNombre("" + ((ArrayList) res2.get(0)).get(3));
                 pk.setDescriptor(false);
                 pk.setMultimedia(false);
                 pk.setPk(true);
@@ -102,6 +108,7 @@ public class Vigilante {
                     attTabla.add(a);
                 }
                 tabla.setAtributoLlave(pk);
+                attTabla.add(pk);
                 tabla.setAtributos(attTabla);
                 tabla.llenaFragmentosxSitio(miIP);
                 this.datosBD.setTabla(tabla);
@@ -112,6 +119,7 @@ public class Vigilante {
                 //Analizar si algun fragmento superó umbrales (incluida la tabla inicial)) mediante el analisis del log
                 //MODIFICAR BASE DE DATOS XAMANA, agregando en atributo EL CAMPO cbir
                 if (this.datosBD.getTipoBD().compareTo("a") == 0) {
+
                     //MYSQL
                     //¿Es el servidor original?
                     if (this.datosBD.getDirbd().compareTo(this.getIP()) == 0) {
@@ -127,7 +135,7 @@ public class Vigilante {
                             //revisar agregado de atributos solo en servidor original
                             nuevosAtributos();
                             //logMySQL();
-                            Thread.sleep(300000);
+                            Thread.sleep(30000);
                         }
                     } else {
                         //Abro socket
@@ -317,9 +325,11 @@ public class Vigilante {
             }
             ArrayList<String> nombresAtributosEnXamana = new ArrayList<>();
             this.datosBD.getTabla().getAtributos().forEach(x -> nombresAtributosEnXamana.add(x.getNombre()));
+            nombresAtributosEnXamana.forEach(x -> System.out.println("Atributo logico: " + x));
             if (!this.isNullorEmpty(atts)) {
                 for (String att : atts) {
                     String nombre = att.split(":")[0];
+                    System.out.println("Atributo fisico: " + nombre);
                     if (!nombresAtributosEnXamana.contains(nombre)) {
                         JRadioButton rbtn1 = new JRadioButton("Descriptor", true);
                         JRadioButton rbtn2 = new JRadioButton("Multimedia", false);
@@ -346,25 +356,26 @@ public class Vigilante {
                                     }
                                     accesoXamana.desconectar();
                                 }
-                                if (!this.isNullorEmpty(res)) {
-                                    //registrar atributo en xamana
-                                    int t = 0;
-                                    String idAtributo = "";
-                                    if (this.accesoXamana.conectar()) {
-                                        if (rbtn1.isSelected()) {
-                                            t = this.accesoXamana.ejecutarComando("insert into Atributo (tipo,size,nom,descriptor,multimedia,id_tabla) values ('" + att.split(":")[1] + "'," + att.split(":")[2] + ",'" + att.split(":")[0] + "'," + 1 + "," + 0 + "," + this.token + ")");
-                                            idAtributo = "" + ((ArrayList) this.accesoXamana.ejecutarConsulta("Select LAST_INSERT_ID()").get(0)).get(0);
-                                        } else if (rbtn2.isSelected()) {
-                                            t = this.accesoXamana.ejecutarComando("insert into Atributo (tipo,size,nom,descriptor,multimedia,id_tabla) values ('" + att.split(":")[1] + "'," + att.split(":")[2] + ",'" + att.split(":")[0] + "'," + 0 + "," + 1 + "," + this.token + ")");
-                                            idAtributo = "" + ((ArrayList) this.accesoXamana.ejecutarConsulta("Select LAST_INSERT_ID()").get(0)).get(0);
-                                        }
-                                        if (t == 1 && !this.isNullorEmpty(idAtributo)) {
-                                            System.out.println("Atributo insertado");
-                                        } else {
-                                            System.out.println("Atributo no insertado");
-                                        }
-                                        this.accesoXamana.desconectar();
+                                //registrar atributo en xamana
+                                int t = 0;
+                                String idAtributo = "";
+                                if (this.accesoXamana.conectar()) {
+                                    if (rbtn1.isSelected()) {
+                                        t = this.accesoXamana.ejecutarComando("insert into Atributo (tipo,size,nom,descriptor,multimedia,id_tabla) values ('" + att.split(":")[1] + "'," + att.split(":")[2] + ",'" + att.split(":")[0] + "'," + 1 + "," + 0 + "," + this.token + ")");
+                                        idAtributo = "" + ((ArrayList) this.accesoXamana.ejecutarConsulta("Select LAST_INSERT_ID()").get(0)).get(0);
+                                    } else if (rbtn2.isSelected()) {
+                                        t = this.accesoXamana.ejecutarComando("insert into Atributo (tipo,size,nom,descriptor,multimedia,id_tabla) values ('" + att.split(":")[1] + "'," + att.split(":")[2] + ",'" + att.split(":")[0] + "'," + 0 + "," + 1 + "," + this.token + ")");
+                                        idAtributo = "" + ((ArrayList) this.accesoXamana.ejecutarConsulta("Select LAST_INSERT_ID()").get(0)).get(0);
                                     }
+                                    if (t == 1 && !this.isNullorEmpty(idAtributo)) {
+                                        System.out.println("Atributo insertado");
+                                    } else {
+                                        System.out.println("Atributo no insertado");
+                                    }
+                                    this.accesoXamana.desconectar();
+                                }
+                                if (!this.isNullorEmpty(res)) {
+
                                     //buscar en log que sitio ocupó más estos atributos
                                     String sitio = buscaSitioXUsoAtributosMYSQL(nombre, "" + ((ArrayList) res.get(0)).get(0));
                                     //origen
