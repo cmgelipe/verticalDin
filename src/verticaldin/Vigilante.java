@@ -112,6 +112,7 @@ public class Vigilante {
                 tabla.setAtributos(attTabla);
                 tabla.llenaFragmentosxSitio(miIP);
                 this.datosBD.setTabla(tabla);
+                System.out.println(this.datosBD.getTabla().getAtributoLlave().getNombre()+":"+this.datosBD.getTabla().getAtributoLlave().getTipo()+":"+this.datosBD.getTabla().getAtributoLlave().getTamanio());
                 //Análisis de logs para detectar nuevos atributos (alter table add column), comparar atributos de base de xamana
                 // para detectar el atributo nuevo, preguntar si es descriptor o multimedia, agregarlo a la base de xamana
                 //si es descriptor o multimedia, hasta que este el duo de atributos separar en un nuevo fragmento.
@@ -360,14 +361,28 @@ public class Vigilante {
                                 int t = 0;
                                 String idAtributo = "";
                                 if (this.accesoXamana.conectar()) {
+                                    Atributo nAtt=new Atributo();
                                     if (rbtn1.isSelected()) {
-                                        t = this.accesoXamana.ejecutarComando("insert into Atributo (tipo,size,nom,descriptor,multimedia,id_tabla) values ('" + att.split(":")[1] + "'," + att.split(":")[2] + ",'" + att.split(":")[0] + "'," + 1 + "," + 0 + "," + this.token + ")");
+                                        nAtt.setNombre(att.split(":")[0]);
+                                        nAtt.setTipo(att.split(":")[1]);
+                                        nAtt.setTamanio(att.split(":")[2]);
+                                        nAtt.setDescriptor(true);
+                                        nAtt.setMultimedia(false);
+                                        nAtt.setPk(false);
+                                        t = this.accesoXamana.ejecutarComando("insert into Atributo (tipo,size,nom,descriptor,multimedia,pk,id_tabla) values ('" + att.split(":")[1] + "'," + att.split(":")[2] + ",'" + att.split(":")[0] + "',1 , 0 ,0," + this.token + ")");
                                         idAtributo = "" + ((ArrayList) this.accesoXamana.ejecutarConsulta("Select LAST_INSERT_ID()").get(0)).get(0);
                                     } else if (rbtn2.isSelected()) {
-                                        t = this.accesoXamana.ejecutarComando("insert into Atributo (tipo,size,nom,descriptor,multimedia,id_tabla) values ('" + att.split(":")[1] + "'," + att.split(":")[2] + ",'" + att.split(":")[0] + "'," + 0 + "," + 1 + "," + this.token + ")");
+                                        nAtt.setNombre(att.split(":")[0]);
+                                        nAtt.setTipo(att.split(":")[1]);
+                                        nAtt.setTamanio(att.split(":")[2]);
+                                        nAtt.setDescriptor(false);
+                                        nAtt.setMultimedia(true);
+                                        nAtt.setPk(false);
+                                        t = this.accesoXamana.ejecutarComando("insert into Atributo (tipo,size,nom,descriptor,multimedia,pk,id_tabla) values ('" + att.split(":")[1] + "'," + att.split(":")[2] + ",'" + att.split(":")[0] + "',0 ,1 ,0," + this.token + ")");
                                         idAtributo = "" + ((ArrayList) this.accesoXamana.ejecutarConsulta("Select LAST_INSERT_ID()").get(0)).get(0);
                                     }
                                     if (t == 1 && !this.isNullorEmpty(idAtributo)) {
+                                        this.datosBD.getTabla().getAtributos().add(nAtt);
                                         System.out.println("Atributo insertado");
                                     } else {
                                         System.out.println("Atributo no insertado");
@@ -383,11 +398,11 @@ public class Vigilante {
                                     //Destino
                                     AccesoDatosMy accD = new AccesoDatosMy(sitio + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
                                     //Atributos
-                                    this.datosBD.getTabla().setAtributoLlave(this.llaveMySQL(accO, this.datosBD.getNombd(), this.datosBD.getTabla().getNombre()));
-                                    Atributo att1 = new Atributo(idAtributo, nombre, att.split(":")[1], att.split(":")[1], (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false);
-                                    Atributo att2 = new Atributo("" + ((ArrayList) res.get(0)).get(0), "" + ((ArrayList) res.get(0)).get(1), "" + ((ArrayList) res.get(0)).get(2), "" + ((ArrayList) res.get(0)).get(3), (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false);
+                                    
+                                    Atributo att1 = new Atributo(idAtributo, nombre, att.split(":")[1], att.split(":")[2], (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false);
+                                    Atributo att2 = new Atributo("" + ((ArrayList) res.get(0)).get(0), "" + ((ArrayList) res.get(0)).get(1), "" + ((ArrayList) res.get(0)).get(2), "" + ((Double)Double.parseDouble(""+((ArrayList) res.get(0)).get(3))).intValue(), (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false);
                                     ArrayList<Atributo> atributos = new ArrayList<>(Arrays.asList(this.datosBD.getTabla().getAtributoLlave(), att1, att2));
-
+                                    System.out.println(this.datosBD.getTabla().getAtributoLlave().getNombre()+":"+this.datosBD.getTabla().getAtributoLlave().getTipo()+":"+this.datosBD.getTabla().getAtributoLlave().getTamanio());
                                     Fragmentador frag = new Fragmentador(accO, accD, atributos, this.datosBD, this.numeroFragmento++, true);
                                     frag.generarFragmentos();
                                 }
@@ -451,6 +466,7 @@ public class Vigilante {
             att = new Atributo();
             att.setNombre("" + ((ArrayList) res.get(0)).get(0));
             att.setTipo("" + ((ArrayList) res.get(0)).get(1));
+            att.setTipo("" + ((ArrayList) res.get(0)).get(2));
         }
         return att;
     }

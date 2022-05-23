@@ -127,6 +127,7 @@ public class Fragmentador {
                 }
             }
             att_tipo = att_tipo.substring(0, att_tipo.length() - 2);
+            System.out.println(att_tipo);
             att_nombre = att_nombre.substring(0, att_nombre.length() - 2);
             //recuperar datos
             ArrayList arr = null;
@@ -147,15 +148,17 @@ public class Fragmentador {
                             } else {
                                 valores += ((ArrayList) arr.get(i)).get(j) + ", ";
                             }
-                            valores = valores.substring(0, valores.length() - 2);
-                            String q = "INSERT INTO " + this.datosBD.getTabla().getNombre() + "_f" + this.nFragmento + " VALUES (" + valores + ");";
-                            accDestino.ejecutarComando(q);
                         }
+                        valores = valores.substring(0, valores.length() - 2);
+                        String q = "INSERT INTO " + this.datosBD.getTabla().getNombre() + "_f" + this.nFragmento + " VALUES (" + valores + ");";
+                        System.out.println(q);
+                        accDestino.ejecutarComando(q);
+
                     }
                     accDestino.desconectar();
                 }
                 //solicitar actualización de fragmentos en el servidor destino (socket)
-                
+
                 Socket socket = new Socket(accDestino.sUrl.split(":")[0], 5000);
                 new DataOutputStream(socket.getOutputStream()).writeBoolean(true);
                 socket.close();
@@ -164,16 +167,16 @@ public class Fragmentador {
                 xamanaAcc = new AccesoDatosMy();
                 int r = 0;
                 String idFragmento = "";
-                String idSitio="";
+                String idSitio = "";
                 if (xamanaAcc.conectar()) {
                     //id del sitio
-                    ArrayList arr2=null;
-                    arr2=xamanaAcc.ejecutarConsulta("select id_sitio from Sitio where direccion='"+accDestino.sUrl.split(":")[0]+"'");
-                    if(this.isNullorEmpty(arr2)){
-                        xamanaAcc.ejecutarComando("insert into Sitio (direccion) values('"+accDestino.sUrl.split(":")[0]+"')");
+                    ArrayList arr2 = null;
+                    arr2 = xamanaAcc.ejecutarConsulta("select id_sitio from Sitio where direccion='" + accDestino.sUrl.split(":")[0] + "'");
+                    if (this.isNullorEmpty(arr2)) {
+                        xamanaAcc.ejecutarComando("insert into Sitio (direccion) values('" + accDestino.sUrl.split(":")[0] + "')");
                         idSitio = "" + ((ArrayList) xamanaAcc.ejecutarConsulta("Select LAST_INSERT_ID()").get(0)).get(0);
-                    }else{
-                        idSitio=""+((ArrayList)arr2.get(0)).get(0);
+                    } else {
+                        idSitio = "" + ((ArrayList) arr2.get(0)).get(0);
                     }
                     if (this.fragmentacionCBIR) {
                         xamanaAcc.ejecutarComando("insert into Fragmento(nombre, id_tabla, id_sitio, noperaciones, ndesempenio, isCBIR) value ('"
@@ -201,9 +204,9 @@ public class Fragmentador {
                 if (accOrigen.conectar()) {
                     for (Atributo b : this.getAtts()) {
                         //No eliminar PK
-                        if(b.getNombre().compareTo(this.datosBD.getTabla().getAtributoLlave().getNombre())!=0){
-                            accOrigen.ejecutarComando("alter table "+this.datosBD.getTabla().getNombre()+" drop column "+b.getNombre());
-                            System.out.println(b.getNombre()+": Atributo eliminado de la tabla original");
+                        if (b.getNombre().compareTo(this.datosBD.getTabla().getAtributoLlave().getNombre()) != 0) {
+                            accOrigen.ejecutarComando("alter table " + this.datosBD.getTabla().getNombre() + " drop column " + b.getNombre());
+                            System.out.println(b.getNombre() + ": Atributo eliminado de la tabla original");
                         }
                     }
                     accOrigen.desconectar();
