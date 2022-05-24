@@ -112,7 +112,7 @@ public class Vigilante {
                 tabla.setAtributos(attTabla);
                 tabla.llenaFragmentosxSitio(miIP);
                 this.datosBD.setTabla(tabla);
-                System.out.println(this.datosBD.getTabla().getAtributoLlave().getNombre()+":"+this.datosBD.getTabla().getAtributoLlave().getTipo()+":"+this.datosBD.getTabla().getAtributoLlave().getTamanio());
+                System.out.println(this.datosBD.getTabla().getAtributoLlave().getNombre() + ":" + this.datosBD.getTabla().getAtributoLlave().getTipo() + ":" + this.datosBD.getTabla().getAtributoLlave().getTamanio());
                 //Análisis de logs para detectar nuevos atributos (alter table add column), comparar atributos de base de xamana
                 // para detectar el atributo nuevo, preguntar si es descriptor o multimedia, agregarlo a la base de xamana
                 //si es descriptor o multimedia, hasta que este el duo de atributos separar en un nuevo fragmento.
@@ -123,7 +123,7 @@ public class Vigilante {
 
                     //MYSQL
                     //¿Es el servidor original?
-                    if (this.datosBD.getDirbd().compareTo(this.getIP()) == 0) {
+                    if (this.datosBD.getDirbd().compareTo(miIP) == 0) {
                         //Abro socket
                         hilo.start();
                         while (true) {
@@ -136,7 +136,7 @@ public class Vigilante {
                             //revisar agregado de atributos solo en servidor original
                             nuevosAtributos();
                             //logMySQL();
-                            Thread.sleep(30000);
+                            Thread.sleep(5000);
                         }
                     } else {
                         //Abro socket
@@ -270,7 +270,7 @@ public class Vigilante {
             for (File item : archivos) {
                 if (item.isFile()) {
                     RandomAccessFile raf = new RandomAccessFile(item.toString(), "r");
-                    String ip = "127.0.0.1";
+                    String ip = miIP;
                     String nombre = "";
                     while (raf.getFilePointer() < raf.length()) {
                         String actual = raf.readLine();
@@ -279,7 +279,7 @@ public class Vigilante {
                             ip = y[2].substring(y[2].indexOf("@") + 1, y[2].indexOf(" ", y[2].indexOf("@") + 1));
                             nombre = y[1].substring(0, y[1].indexOf(" "));
                             if (ip.toLowerCase().compareTo("localhost") == 0 || ip.toLowerCase().compareTo("::1") == 0) {
-                                ip = "127.0.0.1";
+                                ip = miIP;
                             }
                             ArrayList IpUso = new ArrayList<>();
                             IpUso.add(ip);  //IP
@@ -310,6 +310,9 @@ public class Vigilante {
             }
         } catch (Exception e) {
             e.printStackTrace();
+        }
+        if (IPmasOcupada.isEmpty()) {
+            IPmasOcupada = miIP;
         }
         return IPmasOcupada;
     }
@@ -361,7 +364,7 @@ public class Vigilante {
                                 int t = 0;
                                 String idAtributo = "";
                                 if (this.accesoXamana.conectar()) {
-                                    Atributo nAtt=new Atributo();
+                                    Atributo nAtt = new Atributo();
                                     if (rbtn1.isSelected()) {
                                         nAtt.setNombre(att.split(":")[0]);
                                         nAtt.setTipo(att.split(":")[1]);
@@ -398,17 +401,36 @@ public class Vigilante {
                                     //Destino
                                     AccesoDatosMy accD = new AccesoDatosMy(sitio + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
                                     //Atributos
-                                    
-                                    Atributo att1 = new Atributo(idAtributo, nombre, att.split(":")[1], att.split(":")[2], (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false);
-                                    Atributo att2 = new Atributo("" + ((ArrayList) res.get(0)).get(0), "" + ((ArrayList) res.get(0)).get(1), "" + ((ArrayList) res.get(0)).get(2), "" + ((Double)Double.parseDouble(""+((ArrayList) res.get(0)).get(3))).intValue(), (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false);
+                                    Atributo att1 = new Atributo(idAtributo, nombre, att.split(":")[1], att.split(":")[2], (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false, false);
+                                    Atributo att2 = new Atributo("" + ((ArrayList) res.get(0)).get(0), "" + ((ArrayList) res.get(0)).get(1), "" + ((ArrayList) res.get(0)).get(2), "" + ((Double) Double.parseDouble("" + ((ArrayList) res.get(0)).get(3))).intValue(), (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false, false);
                                     ArrayList<Atributo> atributos = new ArrayList<>(Arrays.asList(this.datosBD.getTabla().getAtributoLlave(), att1, att2));
-                                    System.out.println(this.datosBD.getTabla().getAtributoLlave().getNombre()+":"+this.datosBD.getTabla().getAtributoLlave().getTipo()+":"+this.datosBD.getTabla().getAtributoLlave().getTamanio());
                                     Fragmentador frag = new Fragmentador(accO, accD, atributos, this.datosBD, this.numeroFragmento++, true);
                                     frag.generarFragmentos();
                                 }
                             }
                         } else {
-                            //atributo normal, no hacer nada, se debe analizar el log
+                            //atributo normal, no fragmentar, se debe analizar el log
+                            //registrar atributo en xamana
+                            int t = 0;
+                            String idAtributo = "";
+                            if (this.accesoXamana.conectar()) {
+                                Atributo nAtt = new Atributo();
+                                nAtt.setNombre(att.split(":")[0]);
+                                nAtt.setTipo(att.split(":")[1]);
+                                nAtt.setTamanio(att.split(":")[2]);
+                                nAtt.setDescriptor(false);
+                                nAtt.setMultimedia(false);
+                                nAtt.setPk(false);
+                                t = this.accesoXamana.ejecutarComando("insert into Atributo (tipo,size,nom,descriptor,multimedia,pk,id_tabla) values ('" + att.split(":")[1] + "'," + att.split(":")[2] + ",'" + att.split(":")[0] + "',0 , 0 ,0," + this.token + ")");
+                                idAtributo = "" + ((ArrayList) this.accesoXamana.ejecutarConsulta("Select LAST_INSERT_ID()").get(0)).get(0);
+                                if (t == 1 && !this.isNullorEmpty(idAtributo)) {
+                                    this.datosBD.getTabla().getAtributos().add(nAtt);
+                                    System.out.println("Atributo insertado");
+                                } else {
+                                    System.out.println("Atributo no insertado");
+                                }
+                                this.accesoXamana.desconectar();
+                            }
                         }
                     }
                 }

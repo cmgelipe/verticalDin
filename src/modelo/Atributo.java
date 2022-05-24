@@ -21,12 +21,13 @@ public class Atributo {
     public Atributo(){
         
     }
-    public Atributo(String idAtributo, String nombre, String tipo, String tamanio,boolean descriptor,boolean multimedia ){
+    public Atributo(String idAtributo, String nombre, String tipo, String tamanio,boolean descriptor,boolean multimedia, boolean pk ){
         this.setNombre(nombre);
         this.setTipo(tipo);
         this.setTamanio(tamanio);
         this.setDescriptor(descriptor);
         this.setMultimedia(multimedia);
+        this.setPk(pk);
         this.idAtributo=idAtributo;
     }
     

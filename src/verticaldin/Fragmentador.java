@@ -14,7 +14,6 @@ import java.net.Socket;
 import java.util.ArrayList;
 import modelo.Atributo;
 import modelo.BD;
-import modelo.Tabla;
 
 /**
  *
@@ -127,7 +126,6 @@ public class Fragmentador {
                 }
             }
             att_tipo = att_tipo.substring(0, att_tipo.length() - 2);
-            System.out.println(att_tipo);
             att_nombre = att_nombre.substring(0, att_nombre.length() - 2);
             //recuperar datos
             ArrayList arr = null;
@@ -151,29 +149,26 @@ public class Fragmentador {
                         }
                         valores = valores.substring(0, valores.length() - 2);
                         String q = "INSERT INTO " + this.datosBD.getTabla().getNombre() + "_f" + this.nFragmento + " VALUES (" + valores + ");";
-                        System.out.println(q);
                         accDestino.ejecutarComando(q);
 
                     }
                     accDestino.desconectar();
                 }
                 //solicitar actualización de fragmentos en el servidor destino (socket)
-
-                Socket socket = new Socket(accDestino.sUrl.split(":")[0], 5000);
+                Socket socket = new Socket(accDestino.ip, 5000);
                 new DataOutputStream(socket.getOutputStream()).writeBoolean(true);
                 socket.close();
                 //Registrar datos en xamana
-
+                System.out.println("registra en xamana");
                 xamanaAcc = new AccesoDatosMy();
-                int r = 0;
                 String idFragmento = "";
                 String idSitio = "";
                 if (xamanaAcc.conectar()) {
                     //id del sitio
                     ArrayList arr2 = null;
-                    arr2 = xamanaAcc.ejecutarConsulta("select id_sitio from Sitio where direccion='" + accDestino.sUrl.split(":")[0] + "'");
+                    arr2 = xamanaAcc.ejecutarConsulta("select id_sitio from Sitio where direccion='" + accDestino.ip + "'");
                     if (this.isNullorEmpty(arr2)) {
-                        xamanaAcc.ejecutarComando("insert into Sitio (direccion) values('" + accDestino.sUrl.split(":")[0] + "')");
+                        xamanaAcc.ejecutarComando("insert into Sitio (direccion) values('" + accDestino.ip + "')");
                         idSitio = "" + ((ArrayList) xamanaAcc.ejecutarConsulta("Select LAST_INSERT_ID()").get(0)).get(0);
                     } else {
                         idSitio = "" + ((ArrayList) arr2.get(0)).get(0);
@@ -191,10 +186,15 @@ public class Fragmentador {
                         idFragmento = "" + ((ArrayList) xamanaAcc.ejecutarConsulta("Select LAST_INSERT_ID()").get(0)).get(0);
                     }
                     //Modificar atributos en xamana
-                    if (r != 0 && !this.isNullorEmpty(idFragmento)) {
+                    if (!this.isNullorEmpty(idFragmento)) {
                         for (Atributo a : this.getAtts()) {
-                            xamanaAcc.ejecutarComando("update Atributo set id_tabla=NULL, id_fragmento=" + idFragmento + " where id_atributo=" + a.getIdAtributo());
+                            if(!a.isPk()){
+                                xamanaAcc.ejecutarComando("update Atributo set id_tabla=NULL, id_fragmento=" + idFragmento + " where id_atributo=" + a.getIdAtributo());
+                            }
                         }
+                        xamanaAcc.ejecutarComando("insert into Atributo (tipo,size,nom,id_fragmento,descriptor,multimedia,pk,id_tabla) values ('"+
+                                this.getAtts().get(0).getTipo()+"',"+this.getAtts().get(0).getTamanio()+",'"+this.getAtts().get(0).getNombre()+"',"+
+                                idFragmento+",0,0,1,null)");
                     }
                     xamanaAcc.desconectar();
                 }
@@ -204,7 +204,7 @@ public class Fragmentador {
                 if (accOrigen.conectar()) {
                     for (Atributo b : this.getAtts()) {
                         //No eliminar PK
-                        if (b.getNombre().compareTo(this.datosBD.getTabla().getAtributoLlave().getNombre()) != 0) {
+                        if (!b.isPk()) {
                             accOrigen.ejecutarComando("alter table " + this.datosBD.getTabla().getNombre() + " drop column " + b.getNombre());
                             System.out.println(b.getNombre() + ": Atributo eliminado de la tabla original");
                         }

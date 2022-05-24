@@ -20,17 +20,20 @@ import java.util.logging.Logger;
 public class AccesoDatosMy extends AccesoDatos implements Serializable {
 
     public String sUrl = null;
+    public String ip = null;
     public static String sUsr = null;
     public static String sPwd = null;
     private java.sql.Connection oConexion;
 
     public AccesoDatosMy() throws Exception {
+        ip = "127.0.0.1";
         sUrl = "jdbc:mysql://localhost/xamana?useSSL=false&serverTimezone=UTC";
         sUsr = "root";
         sPwd = "1122";
     }
     
     public AccesoDatosMy(String url, String nombd, String usr, String pwd) throws Exception {
+        ip = url.split(":")[0];
         sUrl = "jdbc:mysql://"+url+"/"+nombd+"?autoReconnect=true&useSSL=false&serverTimezone=UTC";//"jdbc:mysql://localhost/Master";
         sUsr = usr;//"root";
         sPwd = pwd;//"sunny_4teamo";
