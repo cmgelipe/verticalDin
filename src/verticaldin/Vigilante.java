@@ -10,6 +10,7 @@ import modelo.BD;
 import datos.AccesoDatosMy;
 import datos.AccesoDatosPG;
 import java.io.File;
+import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.net.Inet6Address;
 import java.net.InetAddress;
@@ -18,6 +19,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.swing.ButtonGroup;
 import javax.swing.JOptionPane;
 import javax.swing.JRadioButton;
@@ -34,10 +37,13 @@ public class Vigilante {
     private String token;
     String miIP; //IP del nodo a donde esté el vigilante
     BD datosBD;
-    long caracterLog;
     String dirLogs;
     int numeroFragmento;
     estadoHilo hilo;
+    long caracterLog;
+    String archivoActualLog;
+    
+    HashMap<String, String> NombreIp = new HashMap<>();
 
     public Vigilante(String token, String DirLogs) {
         this.dirLogs = DirLogs;
@@ -110,6 +116,7 @@ public class Vigilante {
                 tabla.setAtributoLlave(pk);
                 attTabla.add(pk);
                 tabla.setAtributos(attTabla);
+                tabla.generaTablaFragmento();
                 tabla.llenaFragmentosxSitio(miIP);
                 this.datosBD.setTabla(tabla);
                 System.out.println(this.datosBD.getTabla().getAtributoLlave().getNombre() + ":" + this.datosBD.getTabla().getAtributoLlave().getTipo() + ":" + this.datosBD.getTabla().getAtributoLlave().getTamanio());
@@ -118,41 +125,27 @@ public class Vigilante {
                 //si es descriptor o multimedia, hasta que este el duo de atributos separar en un nuevo fragmento.
                 //Si no es ninguno de esos dos, entonces dejarlo en la tabla original.
                 //Analizar si algun fragmento superó umbrales (incluida la tabla inicial)) mediante el analisis del log
-                //MODIFICAR BASE DE DATOS XAMANA, agregando en atributo EL CAMPO cbir
-                if (this.datosBD.getTipoBD().compareTo("a") == 0) {
 
+                if (this.datosBD.getTipoBD().compareTo("a") == 0) {
                     //MYSQL
-                    //¿Es el servidor original?
-                    if (this.datosBD.getDirbd().compareTo(miIP) == 0) {
-                        //Abro socket
-                        hilo.start();
-                        while (true) {
-                            //La bandera de refragmentación indica cuando los fragmentos a analizar en los logs ya no son los mismos y es necesario 
-                            //llenar nuevamente con los nuevos fragmentos que se analizaran.
-                            if (hilo.banderaRefragmentacion) {
-                                this.datosBD.getTabla().llenaFragmentosxSitio(miIP);
-                                hilo.banderaRefragmentacion = false;
-                            }
+                    //Abro socket
+                    hilo.start();
+                    while (true) {
+                        //La bandera de refragmentación indica cuando los fragmentos a analizar en los logs ya no son los mismos y es necesario 
+                        //llenar nuevamente con los nuevos fragmentos que se analizaran.
+                        if (hilo.banderaRefragmentacion) {
+                            this.datosBD.getTabla().llenaFragmentosxSitio(miIP);
+                            hilo.banderaRefragmentacion = false;
+                        }
+                        //¿Es el servidor original?
+                        if (this.datosBD.getDirbd().compareTo(miIP) == 0) {
                             //revisar agregado de atributos solo en servidor original
                             nuevosAtributos();
-                            //logMySQL();
-                            Thread.sleep(5000);
-                        }
-                    } else {
-                        //Abro socket
-                        hilo.start();
-                        while (true) {
-                            //La bandera de refragmentación indica cuando los fragmentos a analizar en los logs ya no son los mismos y es necesario 
-                            //llenar nuevamente con los nuevos fragmentos que se analizaran.
-                            if (hilo.banderaRefragmentacion) {
-                                this.datosBD.getTabla().llenaFragmentosxSitio(miIP);
-                                hilo.banderaRefragmentacion = false;
-                            }
-                            //revisar eliminado de atributos, solo para servidores secundarios
+                        } else {
                             eliminadoAtributos();
-                            //logMySQL();
-                            Thread.sleep(300000);
                         }
+                        logMySQL();
+                        Thread.sleep(5000);
                     }
                 } else if (this.datosBD.getTipoBD().compareTo("b") == 0 || this.datosBD.getTipoBD().compareTo("c") == 0) {
                     //POSTGRES
@@ -213,50 +206,108 @@ public class Vigilante {
     }
 
     private void logMySQL() {
-
         try {
-            RandomAccessFile raf = new RandomAccessFile(this.dirLogs, "r");
-            raf.seek(this.caracterLog);
-            while (raf.getFilePointer() < raf.length()) {
-                String linea = raf.readLine();
-                this.caracterLog = raf.getFilePointer();
-
-                for (int i = 0; i < this.datosBD.getTabla().getFragmentos().size(); i++) {
-                    //Paso 1 identificar si hubo un alter de la tabla original para agregar columnas
-                    if (linea.toLowerCase().contains("alter table") && linea.toLowerCase().contains(this.datosBD.getTabla().getNombre().toLowerCase())
-                            && linea.toLowerCase().contains("add")) {
-                        //conectarme a su base de datos para obtener el nuevo atributo
-
+            File carpeta = new File(dirLogs);
+            File archivos[] = carpeta.listFiles();
+            File ultimoModificado = null;
+            for (int i = 0; i < archivos.length; i++) {
+                if (archivos[i].isFile()) {
+                    if (ultimoModificado == null) {
+                        ultimoModificado = archivos[i];
                     }
-
+                    if (archivos[i].lastModified() > ultimoModificado.lastModified()) {
+                        ultimoModificado = archivos[i];
+                    }
                 }
-                /*if (!this.tabla.getFragmentos().get(i).isCbir()) {
-                    if (linea.contains(this.tabla.getFragmentos().get(i).getNombre())) {//Si la linea contiene el nombre del fragmento en turno
-
+            }
+            if (ultimoModificado != null) {
+                if (archivoActualLog != null) {
+                    //se debe revisar el ultimo modificado
+                    if (ultimoModificado.length() < this.caracterLog) {
+                        this.caracterLog = 0;
                     }
-                }*/
+                    if (ultimoModificado.toString() != archivoActualLog) {
+                        archivoActualLog = ultimoModificado.toString();
+                    }
+                    RandomAccessFile raf = new RandomAccessFile(ultimoModificado, "r");
+                    raf.seek(this.caracterLog);
+                    logMySQLextencion(raf);
+                } else {
+                    //se deben de revisar todos los archivos
+                    for (File archivo : archivos) {
+                        RandomAccessFile raf = new RandomAccessFile(archivo, "r");
+                        logMySQLextencion(raf);
+                    }
+                    archivoActualLog = ultimoModificado.toString();
+                }
+            } else {
+                System.out.println("No hay archivos en la carpeta");
             }
         } catch (Exception e) {
             e.printStackTrace();
-
         }
     }
 
-    public String allocateCBIR(String att1, String att2) {
-        String sitioRet = "";
+    private void logMySQLextencion(RandomAccessFile raf) {
         try {
-            RandomAccessFile raf = new RandomAccessFile(this.dirLogs, "r");
-            raf.seek(this.caracterLog);
+            System.out.println("-----------COSTOS PIPE-------------");
+            this.datosBD.getTabla().getFragmentos().add(this.datosBD.getTabla().getTablaFragmento());
             while (raf.getFilePointer() < raf.length()) {
-                String linea = raf.readLine();
-
+                for (Fragmento f : this.datosBD.getTabla().getFragmentos()) {
+                    f.setNdesempenioLineaLog(0.0);
+                    f.setNoperacionesLineaLog(0.0);
+                }
+                String actual = raf.readLine();
+                String ipLinea = "";
+                String nombre = "";
+                if (actual.contains("Connect\t") && !actual.contains("denied")) {
+                    String y[] = actual.split("\t");
+                    ipLinea = y[2].substring(y[2].indexOf("@") + 1, y[2].indexOf(" ", y[2].indexOf("@") + 1));
+                    nombre = y[1].substring(0, y[1].indexOf(" "));
+                    if (ipLinea.toLowerCase().compareTo("localhost") == 0 || ipLinea.toLowerCase().compareTo("::1") == 0) {
+                        ipLinea = "127.0.0.1";
+                    }
+                    NombreIp.put(nombre, ipLinea);
+                }
+                if (actual.toLowerCase().contains("select") || actual.toLowerCase().contains("delete")
+                        || actual.toLowerCase().contains("insert") || actual.toLowerCase().contains("update")) {
+                    for (Fragmento f : this.datosBD.getTabla().getFragmentos()) {
+                        if (actual.toLowerCase().contains(f.getNombre().toLowerCase())) {
+                            if (actual.toLowerCase().contains("select")) {
+                                f.setNdesempenioLineaLog(1);
+                            } else if (actual.toLowerCase().contains("delete") || actual.toLowerCase().contains("insert")) {
+                                f.setNdesempenioLineaLog(2);
+                            } else if (actual.toLowerCase().contains("update")) {
+                                f.setNdesempenioLineaLog(3);
+                            }
+                            String y[] = actual.split("\t");
+                            String sujeto = y[1].substring(0, y[1].indexOf(" "));
+                            String ipTraduccion = NombreIp.get(sujeto);
+                            System.out.println(actual);
+                            System.out.println("SITIO: " + ipTraduccion);
+                            if (ipTraduccion.compareTo(this.miIP) != 0) {
+                                f.setNdesempenioLineaLog(f.getNdesempenioLineaLog()*2);
+                            }
+                            System.out.println("VAO: " + f.getNdesempenioLineaLog());
+                            int nJoins = incidencias(actual.toLowerCase(), " join ");
+                            System.out.println("CR: " + nJoins);
+                            double costoOperacion = 0.0;
+                            for (Atributo a : f.getAtributos()) {
+                                if (actual.toLowerCase().contains(a.getNombre().toLowerCase())) {
+                                    System.out.println("Tamaño de atributo " + a.getNombre() + ": " + Double.parseDouble(a.getTamanio()));
+                                    costoOperacion += f.getNdesempenioLineaLog() * nJoins * Double.parseDouble(a.getTamanio());
+                                }
+                            }
+                        }
+                    }
+                }
             }
-        } catch (Exception e) {
-            e.printStackTrace();
+            this.datosBD.getTabla().setFragmentos(new ArrayList<>(this.datosBD.getTabla().getFragmentos().subList(0, this.datosBD.getTabla().getFragmentos().size()-1)));
+        } catch (IOException ex) {
+            ex.printStackTrace();
         }
-        return sitioRet;
     }
-
+    
     public String buscaSitioXUsoAtributosMYSQL(String att1, String att2) {
         /*
          Método para buscar en log el sitio que más ocupa atributos CBIR
@@ -386,6 +437,7 @@ public class Vigilante {
                                     }
                                     if (t == 1 && !this.isNullorEmpty(idAtributo)) {
                                         this.datosBD.getTabla().getAtributos().add(nAtt);
+                                        this.datosBD.getTabla().getTablaFragmento().getAtributos().add(nAtt);
                                         System.out.println("Atributo insertado");
                                     } else {
                                         System.out.println("Atributo no insertado");
@@ -425,6 +477,7 @@ public class Vigilante {
                                 idAtributo = "" + ((ArrayList) this.accesoXamana.ejecutarConsulta("Select LAST_INSERT_ID()").get(0)).get(0);
                                 if (t == 1 && !this.isNullorEmpty(idAtributo)) {
                                     this.datosBD.getTabla().getAtributos().add(nAtt);
+                                    this.datosBD.getTabla().getTablaFragmento().getAtributos().add(nAtt);
                                     System.out.println("Atributo insertado");
                                 } else {
                                     System.out.println("Atributo no insertado");
@@ -519,6 +572,15 @@ public class Vigilante {
         } catch (Exception e) {
             e.printStackTrace();
         }
-
+    }
+    
+    private int incidencias(String origen, String palabra) {
+        //costo de reuniones=n+1 
+        int i = 1;
+        while (origen.indexOf(palabra) > -1) {
+            origen = origen.substring(origen.indexOf(palabra) + palabra.length(), origen.length());
+            i++;
+        }
+        return i;
     }
 }

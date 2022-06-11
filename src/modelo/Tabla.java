@@ -20,7 +20,14 @@ public class Tabla {
     private ArrayList<Fragmento> fragmentos = null;
     private ArrayList<Atributo> atributos;
     AccesoDatosMy accesoXamana;
-
+    private Fragmento tablaFragmento;
+    
+    public void generaTablaFragmento(){
+        tablaFragmento=new Fragmento();
+        tablaFragmento.setNombre(nombre);
+        tablaFragmento.setAtributos(new ArrayList<Atributo>());
+        tablaFragmento.setCbir(false);
+    }
     /**
      * @return the nombre
      */
@@ -140,7 +147,7 @@ public class Tabla {
                         f.setNdesempenio(Double.parseDouble("" + ((ArrayList) tupla).get(3)));
                         f.setCbir(Boolean.parseBoolean("" + ((ArrayList) tupla).get(4)));
                         //buscar atributos de fragmento y agregarlos al fragmento
-                        res3 = accesoXamana.ejecutarConsulta("select id_atributo, tipo, size,nom, descriptor, multimedia "
+                        res3 = accesoXamana.ejecutarConsulta("select id_atributo, tipo, size,nom, descriptor, multimedia, pk "
                                 + "from Atributo "
                                 + "where id_fragmento=" + f.getId_fragmento() + "");
                         ArrayList<Atributo> attsFragmento = new ArrayList<>();
@@ -151,16 +158,17 @@ public class Tabla {
                                 a.setTipo("" + ((ArrayList) res3.get(k)).get(1));
                                 a.setTamanio("" + ((ArrayList) res3.get(k)).get(2));
                                 a.setNombre("" + ((ArrayList) res3.get(k)).get(3));
-                                boolean d = (("" + ((ArrayList) res3.get(k)).get(4)).compareTo("0") == 0) ? false : true;
-                                a.setDescriptor(d);
-                                d = (("" + ((ArrayList) res3.get(k)).get(5)).compareTo("0") == 0) ? false : true;
-                                a.setMultimedia(d);
+                                a.setDescriptor(("" + ((ArrayList) res3.get(k)).get(4)).compareTo("0") != 0);
+                                a.setMultimedia(("" + ((ArrayList) res3.get(k)).get(5)).compareTo("0") != 0);
+                                a.setPk(("" + ((ArrayList) res3.get(k)).get(6)).compareTo("0") != 0);
                                 attsFragmento.add(a);
                             }
                         }
                         f.setAtributos(attsFragmento);
+                        
                         getFragmentos().add(f);
                     }
+                    this.tablaFragmento.setAtributos(new ArrayList<>());
                 }
                 accesoXamana.desconectar();
             } else {
@@ -211,5 +219,19 @@ public class Tabla {
      */
     public void setAtributos(ArrayList<Atributo> atributos) {
         this.atributos = atributos;
+    }
+
+    /**
+     * @return the tablaFragmento
+     */
+    public Fragmento getTablaFragmento() {
+        return tablaFragmento;
+    }
+
+    /**
+     * @param tablaFragmento the tablaFragmento to set
+     */
+    public void setTablaFragmento(Fragmento tablaFragmento) {
+        this.tablaFragmento = tablaFragmento;
     }
 }

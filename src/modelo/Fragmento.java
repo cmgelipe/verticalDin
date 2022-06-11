@@ -17,6 +17,10 @@ public class Fragmento {
     private String nombre;
     private double noperaciones;
     private double ndesempenio;
+    private double noperacionesActual;
+    private double ndesempenioActual;
+    private double noperacionesLineaLog;
+    private double ndesempenioLineaLog;
     private boolean cbir;
     private ArrayList<Atributo> atributos;
 
@@ -128,6 +132,62 @@ public class Fragmento {
      */
     public void setAtributos(ArrayList<Atributo> atributos) {
         this.atributos = atributos;
+    }
+
+    /**
+     * @return the noperacionesActual
+     */
+    public double getNoperacionesActual() {
+        return noperacionesActual;
+    }
+
+    /**
+     * @param noperacionesActual the noperacionesActual to set
+     */
+    public void setNoperacionesActual(double noperacionesActual) {
+        this.noperacionesActual = noperacionesActual;
+    }
+
+    /**
+     * @return the ndesempenioActual
+     */
+    public double getNdesempenioActual() {
+        return ndesempenioActual;
+    }
+
+    /**
+     * @param ndesempenioActual the ndesempenioActual to set
+     */
+    public void setNdesempenioActual(double ndesempenioActual) {
+        this.ndesempenioActual = ndesempenioActual;
+    }
+
+    /**
+     * @return the noperacionesLineaLog
+     */
+    public double getNoperacionesLineaLog() {
+        return noperacionesLineaLog;
+    }
+
+    /**
+     * @param noperacionesLineaLog the noperacionesLineaLog to set
+     */
+    public void setNoperacionesLineaLog(double noperacionesLineaLog) {
+        this.noperacionesLineaLog = noperacionesLineaLog;
+    }
+
+    /**
+     * @return the ndesempenioLineaLog
+     */
+    public double getNdesempenioLineaLog() {
+        return ndesempenioLineaLog;
+    }
+
+    /**
+     * @param ndesempenioLineaLog the ndesempenioLineaLog to set
+     */
+    public void setNdesempenioLineaLog(double ndesempenioLineaLog) {
+        this.ndesempenioLineaLog = ndesempenioLineaLog;
     }
     
 }
