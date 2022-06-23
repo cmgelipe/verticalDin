@@ -5,6 +5,9 @@
  */
 package modelo;
 
+
+import java.util.HashMap;
+
 /**
  *
  * @author pipe
@@ -17,9 +20,10 @@ public class Atributo {
     private boolean descriptor;
     private boolean multimedia;
     private boolean pk;
+    private HashMap<String, Double> costoAtributoxSitio; //sitio-costo
     
     public Atributo(){
-        
+        costoAtributoxSitio=new HashMap<>();
     }
     public Atributo(String idAtributo, String nombre, String tipo, String tamanio,boolean descriptor,boolean multimedia, boolean pk ){
         this.setNombre(nombre);
@@ -29,6 +33,7 @@ public class Atributo {
         this.setMultimedia(multimedia);
         this.setPk(pk);
         this.idAtributo=idAtributo;
+        costoAtributoxSitio=new HashMap<>();
     }
     
     /**
@@ -127,6 +132,20 @@ public class Atributo {
      */
     public void setPk(boolean pk) {
         this.pk = pk;
+    }
+
+    /**
+     * @return the costoAtributoxSitio
+     */
+    public HashMap<String, Double> getCostoAtributoxSitio() {
+        return costoAtributoxSitio;
+    }
+
+    /**
+     * @param costoAtributoxSitio the costoAtributoxSitio to set
+     */
+    public void setCostoAtributoxSitio(HashMap<String, Double> costoAtributoxSitio) {
+        this.costoAtributoxSitio = costoAtributoxSitio;
     }
     
 }
