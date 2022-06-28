@@ -21,13 +21,15 @@ public class Tabla {
     private ArrayList<Atributo> atributos;
     AccesoDatosMy accesoXamana;
     private Fragmento tablaFragmento;
-    
-    public void generaTablaFragmento(){
-        tablaFragmento=new Fragmento();
+
+    public void generaTablaFragmento() {
+        tablaFragmento = new Fragmento();
         tablaFragmento.setNombre(nombre);
         tablaFragmento.setAtributos(new ArrayList<Atributo>());
         tablaFragmento.setCbir(false);
+        
     }
+
     /**
      * @return the nombre
      */
@@ -165,10 +167,9 @@ public class Tabla {
                             }
                         }
                         f.setAtributos(attsFragmento);
-                        
+
                         getFragmentos().add(f);
                     }
-                    this.tablaFragmento.setAtributos(new ArrayList<>());
                 }
                 accesoXamana.desconectar();
             } else {
@@ -233,5 +234,37 @@ public class Tabla {
      */
     public void setTablaFragmento(Fragmento tablaFragmento) {
         this.tablaFragmento = tablaFragmento;
+    }
+
+    public void llenaAtributosTablaFragmento() {
+        ArrayList res4 = null;
+        ArrayList<Atributo> arrAtt=new ArrayList<>();
+        String q = "select id_atributo, tipo, size,nom, descriptor, multimedia, pk from "
+                + "Atributo where id_tabla=" + this.idTabla;
+        try {
+            if (this.accesoXamana.conectar()) {
+                res4 = this.accesoXamana.ejecutarConsulta(q);
+                this.accesoXamana.desconectar();
+            }
+            if(!this.isNullorEmpty(res4)){
+                
+                for(int i=0;i<res4.size();i++){
+                    
+                    Atributo att=new Atributo();
+                    att.setIdAtributo(""+((ArrayList)res4.get(i)).get(0));
+                    att.setTipo(""+((ArrayList)res4.get(i)).get(1));
+                    att.setTamanio(""+((ArrayList)res4.get(i)).get(2));
+                    att.setNombre(""+((ArrayList)res4.get(i)).get(3));
+                    att.setDescriptor(("" + ((ArrayList) res4.get(i)).get(4)).compareTo("0") != 0);
+                    att.setMultimedia(("" + ((ArrayList) res4.get(i)).get(5)).compareTo("0") != 0);
+                    att.setPk(false);
+                    arrAtt.add(att);
+                    System.out.println("Atributo agregado a fragmentotabla: "+att.getNombre());
+                }
+                this.tablaFragmento.setAtributos(atributos);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }

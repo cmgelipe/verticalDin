@@ -116,9 +116,12 @@ public class Vigilante {
                 tabla.setAtributoLlave(pk);
                 attTabla.add(pk);
                 tabla.setAtributos(attTabla);
-                tabla.generaTablaFragmento();
+                tabla.generaTablaFragmento(); //crear fragmento de la tabla original, para que sea tratado posteriormente como un fragmento más
                 tabla.llenaFragmentosxSitio(miIP);
                 this.datosBD.setTabla(tabla);
+                if (this.datosBD.getDirbd().compareTo(miIP) == 0) {
+                    this.datosBD.getTabla().getFragmentos().add(this.datosBD.getTabla().getTablaFragmento());
+                }
                 System.out.println(this.datosBD.getTabla().getAtributoLlave().getNombre() + ":" + this.datosBD.getTabla().getAtributoLlave().getTipo() + ":" + this.datosBD.getTabla().getAtributoLlave().getTamanio());
                 //Análisis de logs para detectar nuevos atributos (alter table add column), comparar atributos de base de xamana
                 // para detectar el atributo nuevo, preguntar si es descriptor o multimedia, agregarlo a la base de xamana
@@ -135,6 +138,9 @@ public class Vigilante {
                         //llenar nuevamente con los nuevos fragmentos que se analizaran.
                         if (hilo.banderaRefragmentacion) {
                             this.datosBD.getTabla().llenaFragmentosxSitio(miIP);
+                            if (this.datosBD.getDirbd().compareTo(miIP) == 0) {
+                                this.datosBD.getTabla().getFragmentos().add(this.datosBD.getTabla().getTablaFragmento());
+                            }
                             hilo.banderaRefragmentacion = false;
                         }
                         //¿Es el servidor original?
@@ -231,14 +237,29 @@ public class Vigilante {
                     }
                     RandomAccessFile raf = new RandomAccessFile(ultimoModificado, "r");
                     raf.seek(this.caracterLog);
+
                     logMySQLextencion(raf);
+                    //revisar si algun fragmento superó umbrales
+                    double costoXFragmento = 0.0;
+                    for (Fragmento f : this.datosBD.getTabla().getFragmentos()) {
+                        costoXFragmento = 0.0;
+                        for (Atributo a : f.getAtributos()) {
+                            for (String clave : a.getCostoAtributoxSitio().keySet()) {
+                                costoXFragmento += a.getCostoAtributoxSitio().get(clave);
+                            }
+                        }
+                        System.out.println("Costo de " + f.getNombre() + " es: " + costoXFragmento);
+                        System.out.println("Umbral en " + this.datosBD.getTabla().getUmbralCO());
+                        System.out.println("Desempeño inicial: " + f.getNdesempenio());
+                        System.out.println("Desempeño a alcanzar: " + f.getNdesempenio() * (this.datosBD.getTabla().getUmbralCO() * .01));
+                    }
+
                 } else {
-                    //se deben de revisar todos los archivos
-                    this.datosBD.getTabla().getFragmentos().add(this.datosBD.getTabla().getTablaFragmento()); //Agregar tabla original 
-                    //para que sea tratada como fragmento
+
                     for (File archivo : archivos) {
                         RandomAccessFile raf = new RandomAccessFile(archivo, "r");
                         logMySQLextencion(raf);
+
                     }
                     //revisar si algun fragmento superó umbrales
                     double costoXFragmento = 0.0;
@@ -250,12 +271,12 @@ public class Vigilante {
                             }
                         }
                         System.out.println("Costo de " + f.getNombre() + " es: " + costoXFragmento);
-                        System.out.println("Umbral en "+this.datosBD.getTabla().getUmbralCO());
-                        System.out.println("Desempeño inicial: "+f.getNdesempenio());
-                        System.out.println("Desempeño a alcanzar: "+f.getNdesempenio()*(this.datosBD.getTabla().getUmbralCO()*.01));
+                        System.out.println("Umbral en " + this.datosBD.getTabla().getUmbralCO());
+                        System.out.println("Desempeño inicial: " + f.getNdesempenio());
+                        System.out.println("Desempeño a alcanzar: " + f.getNdesempenio() * (this.datosBD.getTabla().getUmbralCO() * .01));
                     }
-                    this.datosBD.getTabla().setFragmentos(new ArrayList<>(this.datosBD.getTabla().getFragmentos().subList(0, this.datosBD.getTabla().getFragmentos().size() - 1))); //Quitar la tabla original
-                    archivoActualLog = ultimoModificado.toString();                                                                                                                 //que no forma parte de fragmentos      
+
+                    archivoActualLog = ultimoModificado.toString();
                 }
             } else {
                 System.out.println("No hay archivos en la carpeta");
@@ -310,6 +331,7 @@ public class Vigilante {
                             int nJoins = incidencias(actual.toLowerCase(), " join ");
                             System.out.println("CR: " + nJoins);
                             for (int j = 0; j < f.getAtributos().size(); j++) {
+                                System.out.println("Atributo: " + f.getAtributos().get(j).getNombre().toLowerCase());
                                 if (actual.toLowerCase().contains(f.getAtributos().get(j).getNombre().toLowerCase()) || actual.contains(" * ")) {
                                     System.out.println("Tamaño de atributo " + f.getAtributos().get(j).getNombre() + ": " + Double.parseDouble(f.getAtributos().get(j).getTamanio()));
                                     Double valorActual = 0.0;
@@ -403,11 +425,11 @@ public class Vigilante {
             }
             ArrayList<String> nombresAtributosEnXamana = new ArrayList<>();
             this.datosBD.getTabla().getAtributos().forEach(x -> nombresAtributosEnXamana.add(x.getNombre()));
-            nombresAtributosEnXamana.forEach(x -> System.out.println("Atributo logico: " + x));
+            //nombresAtributosEnXamana.forEach(x -> System.out.println("Atributo logico: " + x));
             if (!this.isNullorEmpty(atts)) {
                 for (String att : atts) {
                     String nombre = att.split(":")[0];
-                    System.out.println("Atributo fisico: " + nombre);
+                    //System.out.println("Atributo fisico: " + nombre);
                     if (!nombresAtributosEnXamana.contains(nombre)) {
                         JRadioButton rbtn1 = new JRadioButton("Descriptor", true);
                         JRadioButton rbtn2 = new JRadioButton("Multimedia", false);
