@@ -15,6 +15,7 @@ public class Tabla {
     private String nombre;
     private double umbralOP;
     private double umbralCO;
+    private double ndesempenio;
     private Atributo atributoLlave;
     private String idTabla;
     private ArrayList<Fragmento> fragmentos = null;
@@ -27,7 +28,7 @@ public class Tabla {
         tablaFragmento.setNombre(nombre);
         tablaFragmento.setAtributos(new ArrayList<Atributo>());
         tablaFragmento.setCbir(false);
-        
+        tablaFragmento.setNdesempenio(getNdesempenio());
     }
 
     /**
@@ -266,5 +267,19 @@ public class Tabla {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * @return the ndesempenio
+     */
+    public double getNdesempenio() {
+        return ndesempenio;
+    }
+
+    /**
+     * @param ndesempenio the ndesempenio to set
+     */
+    public void setNdesempenio(double ndesempenio) {
+        this.ndesempenio = ndesempenio;
     }
 }

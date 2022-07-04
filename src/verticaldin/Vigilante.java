@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.ButtonGroup;
@@ -26,6 +27,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JRadioButton;
 import modelo.Atributo;
 import modelo.Fragmento;
+import modelo.TablaCosto;
 
 /**
  *
@@ -57,7 +59,7 @@ public class Vigilante {
             accesoXamana = new AccesoDatosMy();
             if (accesoXamana.conectar()) {
                 String sql = "select BD.nombre, direccion, puerto, gestor, usr, psw, "
-                        + "Tabla.nombre, Tabla.umbral_op, Tabla.umbral_des from BD "
+                        + "Tabla.nombre, Tabla.umbral_op, Tabla.umbral_des, Tabla.ndesempenio from BD "
                         + "join Tabla on Tabla.id_BD=BD.id_BD "
                         + "join Fragmento on Fragmento.id_tabla=Tabla.id_tabla "
                         + "where Fragmento.id_tabla=" + token;
@@ -92,7 +94,7 @@ public class Vigilante {
                 tabla.setNombre("" + ((ArrayList) res.get(0)).get(6));
                 tabla.setUmbralOP(Double.parseDouble("" + ((ArrayList) res.get(0)).get(7)));
                 tabla.setUmbralCO(Double.parseDouble("" + ((ArrayList) res.get(0)).get(8)));
-
+                tabla.setNdesempenio(Double.parseDouble("" + ((ArrayList) res.get(0)).get(9)));
                 //buscar Atributos de tabla y agregarlos a la tabla
                 ArrayList<Atributo> attTabla = new ArrayList<>();
                 Atributo pk = new Atributo();
@@ -252,8 +254,65 @@ public class Vigilante {
                         System.out.println("Umbral en " + this.datosBD.getTabla().getUmbralCO());
                         System.out.println("Desempeño inicial: " + f.getNdesempenio());
                         System.out.println("Desempeño a alcanzar: " + f.getNdesempenio() * (this.datosBD.getTabla().getUmbralCO() * .01));
+                        if (costoXFragmento >= (f.getNdesempenio() * (this.datosBD.getTabla().getUmbralCO() * .01))) {
+                            //ALCANZÓ UMBRAL
+                            if (!f.isCbir()) {
+                                HashMap<String, ArrayList<Atributo>> sitioAtributos = new HashMap<>();
+                                ArrayList<TablaCosto> nuevoEsquema = new ArrayList<>();
+                                ArrayList<Atributo> attsSinCosto = new ArrayList<>();
+                                for (Atributo a : f.getAtributos()) {
+                                    try {
+                                        String ip = this.getMaxEntry(a.getCostoAtributoxSitio()).getKey();
+                                        if (sitioAtributos.containsKey(ip)) {
+                                            //no se deben agregar atributos cbir
+                                            if(!a.isDescriptor() && !a.isMultimedia() && !a.isPk()){
+                                                sitioAtributos.get(ip).add(a);
+                                            }
+                                        } else {
+                                            ArrayList<Atributo> temp = new ArrayList<>();
+                                            temp.add(a);
+                                            sitioAtributos.put(ip, temp);
+                                        }
+                                    } catch (Exception e) {
+                                        e.printStackTrace();
+                                        if (!attsSinCosto.contains(a)) {
+                                            attsSinCosto.add(a);
+                                        }
+                                    }
+                                }
+                                for (String key : sitioAtributos.keySet()) {
+                                    if (!sitioAtributos.get(key).isEmpty()) {
+                                        TablaCosto tc = new TablaCosto();
+                                        tc.setNombre(f.getNombre());
+                                        tc.setSitio(key);
+                                        tc.setCosto(costoXFragmento);
+                                        tc.setArrAtri(sitioAtributos.get(key));
+                                        tc.getArrAtri().add(this.datosBD.getTabla().getAtributoLlave());
+                                        nuevoEsquema.add(tc);
+                                    }
+                                }
+                                if (attsSinCosto.size() > 0) {
+                                    nuevoEsquema.get(0).getArrAtri().addAll(attsSinCosto);
+                                }
+                                nuevoEsquema=this.nombrar(nuevoEsquema);
+                                //si es fragmento que no sea la tabla original
+                                //y la ip a donde se asignará es igual a la ip a donde estoy parado
+                                //y es el único atributo
+                                //no se debe refragmentar,
+                                //si es fragmento de la tabla original, si se debe fragmentar
+                                System.out.println("-------------------------NUEVO ESQUEMA---------------------");
+                                for(TablaCosto tc:nuevoEsquema){
+                                    System.out.println(tc.getNombre()+"\t"+tc.getSitio()+"\t"+tc.getAtributosxComa()+"\t"+tc.getCosto());
+                                    if(f.==0){
+                                       //AQUI ME QUEDÉ
+                                       //MARCAR EL FRAGMENTO DE TABLA ORIGINAL PARA DISTINGUIRLO
+                                    }
+                                }
+                            } else {
+                                System.out.println("No fragmentar, el fragmento es CBIR");
+                            }
+                        }
                     }
-
                 } else {
 
                     for (File archivo : archivos) {
@@ -274,6 +333,10 @@ public class Vigilante {
                         System.out.println("Umbral en " + this.datosBD.getTabla().getUmbralCO());
                         System.out.println("Desempeño inicial: " + f.getNdesempenio());
                         System.out.println("Desempeño a alcanzar: " + f.getNdesempenio() * (this.datosBD.getTabla().getUmbralCO() * .01));
+                        if (costoXFragmento >= (f.getNdesempenio() * (this.datosBD.getTabla().getUmbralCO() * .01))) {
+                            //ALCANZÓ UMBRAL
+
+                        }
                     }
 
                     archivoActualLog = ultimoModificado.toString();
@@ -627,5 +690,27 @@ public class Vigilante {
             i++;
         }
         return i;
+    }
+
+    public Map.Entry<String, Double> getMaxEntry(Map<String, Double> map) {
+        Map.Entry<String, Double> maxEntry = null;
+        for (Map.Entry<String, Double> entry : map.entrySet()) {
+            if (maxEntry == null) {
+                maxEntry = entry;
+            } else {
+                Double value = entry.getValue();
+                if (null != value && value > maxEntry.getValue()) {
+                    maxEntry = entry;
+                }
+            }
+        }
+
+        return maxEntry;
+    }
+    public ArrayList<TablaCosto> nombrar(ArrayList<TablaCosto> ori) {
+        for (int i = 0; i < ori.size(); i++) {
+            ori.get(i).setNombre(ori.get(i).getNombre() + "_" + (i + 1));
+        }
+        return ori;
     }
 }

@@ -18,7 +18,7 @@ public class VerticalDin {
     public static void main(String[] args) {
         //arg[0] es token
         //arg[1] es dirección de logs
-        Vigilante vig=new Vigilante("44","/home/pipe/Documentos/logs/");
+        Vigilante vig=new Vigilante("46","/home/pipe/Documentos/logs/");
         
     }
     
