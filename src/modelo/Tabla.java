@@ -29,6 +29,7 @@ public class Tabla {
         tablaFragmento.setAtributos(new ArrayList<Atributo>());
         tablaFragmento.setCbir(false);
         tablaFragmento.setNdesempenio(getNdesempenio());
+        tablaFragmento.setFragmentoTabla(true);
     }
 
     /**

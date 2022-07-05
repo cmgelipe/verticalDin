@@ -265,7 +265,7 @@ public class Vigilante {
                                         String ip = this.getMaxEntry(a.getCostoAtributoxSitio()).getKey();
                                         if (sitioAtributos.containsKey(ip)) {
                                             //no se deben agregar atributos cbir
-                                            if(!a.isDescriptor() && !a.isMultimedia() && !a.isPk()){
+                                            if (!a.isDescriptor() && !a.isMultimedia() && !a.isPk()) {
                                                 sitioAtributos.get(ip).add(a);
                                             }
                                         } else {
@@ -294,18 +294,35 @@ public class Vigilante {
                                 if (attsSinCosto.size() > 0) {
                                     nuevoEsquema.get(0).getArrAtri().addAll(attsSinCosto);
                                 }
-                                nuevoEsquema=this.nombrar(nuevoEsquema);
+                                nuevoEsquema = this.nombrar(nuevoEsquema);
                                 //si es fragmento que no sea la tabla original
                                 //y la ip a donde se asignará es igual a la ip a donde estoy parado
                                 //y es el único atributo
                                 //no se debe refragmentar,
                                 //si es fragmento de la tabla original, si se debe fragmentar
                                 System.out.println("-------------------------NUEVO ESQUEMA---------------------");
-                                for(TablaCosto tc:nuevoEsquema){
-                                    System.out.println(tc.getNombre()+"\t"+tc.getSitio()+"\t"+tc.getAtributosxComa()+"\t"+tc.getCosto());
-                                    if(f.==0){
-                                       //AQUI ME QUEDÉ
-                                       //MARCAR EL FRAGMENTO DE TABLA ORIGINAL PARA DISTINGUIRLO
+                                for (TablaCosto tc : nuevoEsquema) {
+                                    System.out.println(tc.getNombre() + "\t" + tc.getSitio() + "\t" + tc.getAtributosxComa() + "\t" + tc.getCosto());
+                                    if (f.isFragmentoTabla()) {
+                                        AccesoDatosMy origen = new AccesoDatosMy(this.miIP + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+                                        AccesoDatosMy destino = new AccesoDatosMy(tc.getSitio() + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+                                        int nFragmento = Integer.parseInt(tc.getNombre().substring(tc.getNombre().lastIndexOf("f") + 1, tc.getNombre().length()));
+                                        Fragmentador fragmentador = new Fragmentador(origen, destino, tc.getArrAtri(), this.datosBD, nFragmento, false, 0, tc.getCosto());
+                                        fragmentador.generarFragmentos();
+                                        System.out.println(">>>>>>>>>>Generado<<<<<<<<<<<");
+                                    } else {
+                                        if (tc.getSitio().compareTo(this.miIP) == 0 && (f.getAtributos().size() + 1/*se agrega 1 por PK*/) <= 2) {
+                                            System.out.println("Alcanzó umbrales, pero no se fragmentará, ya que está en su \nmínima expresión y el sitio destino es el mismo al de origen");
+                                        } else if (tc.getSitio().compareTo(this.miIP) == 0 && (f.getAtributos().size() + 1) == tc.getArrAtri().size()) {
+                                            System.out.println("Alcanzó umbrales, pero no se fragmentará, ya que son los mismos atributos actuales de este fragmento y el sitio destino es el mismo al de origen");
+                                        } else {
+                                            AccesoDatosMy origen = new AccesoDatosMy(this.miIP + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+                                            AccesoDatosMy destino = new AccesoDatosMy(tc.getSitio() + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+                                            int nFragmento = Integer.parseInt(tc.getNombre().substring(tc.getNombre().lastIndexOf("f") + 1, tc.getNombre().length()));
+                                            Fragmentador fragmentador = new Fragmentador(origen, destino, tc.getArrAtri(), this.datosBD, nFragmento, false, 0, tc.getCosto());
+                                            fragmentador.generarFragmentos();
+                                            System.out.println(">>>>>>>>>>Generado<<<<<<<<<<<");
+                                        }
                                     }
                                 }
                             } else {
@@ -707,9 +724,10 @@ public class Vigilante {
 
         return maxEntry;
     }
+
     public ArrayList<TablaCosto> nombrar(ArrayList<TablaCosto> ori) {
         for (int i = 0; i < ori.size(); i++) {
-            ori.get(i).setNombre(ori.get(i).getNombre() + "_" + (i + 1));
+            ori.get(i).setNombre(ori.get(i).getNombre() + "_f" + (i + 1));
         }
         return ori;
     }

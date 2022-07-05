@@ -13,6 +13,7 @@ import java.util.ArrayList;
  * @author pipe
  */
 public class Fragmento {
+
     private String id_fragmento;
     private String nombre;
     private double noperaciones;
@@ -23,6 +24,7 @@ public class Fragmento {
     private double ndesempenioLineaLog;
     private boolean cbir;
     private ArrayList<Atributo> atributos;
+    private boolean fragmentoTabla;
 
     /**
      * @return the nombre
@@ -93,28 +95,28 @@ public class Fragmento {
     public void setId_fragmento(String id_fragmento) {
         this.id_fragmento = id_fragmento;
     }
-    
-    public ArrayList<Atributo> obtenerAtributos(){
-        ArrayList<Atributo> res=new ArrayList<>();
-        try{
-            AccesoDatosMy acc=new AccesoDatosMy();
-            ArrayList arr=null;    
-            if(acc.conectar()){
-                arr=acc.ejecutarConsulta("select nom, tipo, size, descriptor, multimedia from atributo where id_fragmento="+this.id_fragmento);
+
+    public ArrayList<Atributo> obtenerAtributos() {
+        ArrayList<Atributo> res = new ArrayList<>();
+        try {
+            AccesoDatosMy acc = new AccesoDatosMy();
+            ArrayList arr = null;
+            if (acc.conectar()) {
+                arr = acc.ejecutarConsulta("select nom, tipo, size, descriptor, multimedia from atributo where id_fragmento=" + this.id_fragmento);
                 acc.desconectar();
             }
-            if(arr!=null){
-                for(int i=0;i<arr.size();i++){
-                    Atributo att=new Atributo();
-                    att.setNombre(""+((ArrayList)arr.get(i)).get(0));
-                    att.setTipo(""+((ArrayList)arr.get(i)).get(1));
-                    att.setTamanio(""+((ArrayList)arr.get(i)).get(2));
-                    att.setDescriptor(Boolean.parseBoolean(""+((ArrayList)arr.get(i)).get(3)));
-                    att.setMultimedia(Boolean.parseBoolean(""+((ArrayList)arr.get(i)).get(4)));
+            if (arr != null) {
+                for (int i = 0; i < arr.size(); i++) {
+                    Atributo att = new Atributo();
+                    att.setNombre("" + ((ArrayList) arr.get(i)).get(0));
+                    att.setTipo("" + ((ArrayList) arr.get(i)).get(1));
+                    att.setTamanio("" + ((ArrayList) arr.get(i)).get(2));
+                    att.setDescriptor(Boolean.parseBoolean("" + ((ArrayList) arr.get(i)).get(3)));
+                    att.setMultimedia(Boolean.parseBoolean("" + ((ArrayList) arr.get(i)).get(4)));
                     res.add(att);
                 }
             }
-        }catch(Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
         return res;
@@ -189,5 +191,19 @@ public class Fragmento {
     public void setNdesempenioLineaLog(double ndesempenioLineaLog) {
         this.ndesempenioLineaLog = ndesempenioLineaLog;
     }
-    
+
+    /**
+     * @return the fragmentoTabla
+     */
+    public boolean isFragmentoTabla() {
+        return fragmentoTabla;
+    }
+
+    /**
+     * @param fragmentoTabla the fragmentoTabla to set
+     */
+    public void setFragmentoTabla(boolean fragmentoTabla) {
+        this.fragmentoTabla = fragmentoTabla;
+    }
+
 }
