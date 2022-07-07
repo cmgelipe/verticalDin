@@ -30,17 +30,19 @@ public class Fragmentador {
     boolean fragmentacionCBIR;
     double noperaciones;
     double ndesempenio;
+    String sTablaOrigen;
 
-    public Fragmentador(AccesoDatos origen, AccesoDatos destino, ArrayList<Atributo> atts, BD datosBD, int nFragmento, boolean CBIR) {
+    public Fragmentador(AccesoDatos origen, AccesoDatos destino, ArrayList<Atributo> atts, BD datosBD, int nFragmento, boolean CBIR, String nombreTablaOrigen) {
         this.setOrigen(origen);
         this.setDestino(destino);
         this.setAtts(atts);
         this.datosBD = datosBD;
         this.nFragmento = nFragmento;
         this.fragmentacionCBIR = CBIR;
+        this.sTablaOrigen = nombreTablaOrigen;
     }
 
-    public Fragmentador(AccesoDatos origen, AccesoDatos destino, ArrayList<Atributo> atts, BD datosBD, int nFragmento, boolean CBIR, double noperaciones, double ndesempenio) {
+    public Fragmentador(AccesoDatos origen, AccesoDatos destino, ArrayList<Atributo> atts, BD datosBD, int nFragmento, boolean CBIR, double noperaciones, double ndesempenio, String nombreTablaOrigen) {
         //Cuando no es CBIR tiene valores en ndesempenio y noperaciones
         this.setOrigen(origen);
         this.setDestino(destino);
@@ -50,6 +52,7 @@ public class Fragmentador {
         this.fragmentacionCBIR = CBIR;
         this.ndesempenio = ndesempenio;
         this.noperaciones = noperaciones;
+        this.sTablaOrigen = nombreTablaOrigen;
     }
 
     public boolean generarFragmentos() {
@@ -130,13 +133,13 @@ public class Fragmentador {
             //recuperar datos
             ArrayList arr = null;
             if (accOrigen.conectar()) {
-                arr = accOrigen.ejecutarConsulta("select " + att_nombre + " from " + this.datosBD.getTabla().getNombre());
+                arr = accOrigen.ejecutarConsulta("select " + att_nombre + " from " + this.sTablaOrigen);
                 accOrigen.desconectar();
             }
             if (!this.isNullorEmpty(arr)) {
                 //Crear nueva tabla
                 if (accDestino.conectar()) {
-                    accDestino.ejecutarComando("create table " + this.datosBD.getTabla().getNombre() + "_f" + this.nFragmento + " (" + att_tipo + ", PRIMARY KEY (" + this.datosBD.getTabla().getAtributoLlave().getNombre() + "));");
+                    accDestino.ejecutarComando("create table " + this.sTablaOrigen + "_f" + this.nFragmento + " (" + att_tipo + ", PRIMARY KEY (" + this.datosBD.getTabla().getAtributoLlave().getNombre() + "));");
                     //agregar datos
                     for (int i = 0; i < arr.size(); i++) {
                         String valores = "";
@@ -148,16 +151,13 @@ public class Fragmentador {
                             }
                         }
                         valores = valores.substring(0, valores.length() - 2);
-                        String q = "INSERT INTO " + this.datosBD.getTabla().getNombre() + "_f" + this.nFragmento + " VALUES (" + valores + ");";
+                        String q = "INSERT INTO " + this.sTablaOrigen + "_f" + this.nFragmento + " VALUES (" + valores + ");";
                         accDestino.ejecutarComando(q);
 
                     }
                     accDestino.desconectar();
                 }
-                //solicitar actualización de fragmentos en el servidor destino (socket)
-                Socket socket = new Socket(accDestino.ip, 5000);
-                new DataOutputStream(socket.getOutputStream()).writeBoolean(true);
-                socket.close();
+                
                 //Registrar datos en xamana
                 System.out.println("registra en xamana");
                 xamanaAcc = new AccesoDatosMy();
@@ -175,26 +175,29 @@ public class Fragmentador {
                     }
                     if (this.fragmentacionCBIR) {
                         xamanaAcc.ejecutarComando("insert into Fragmento(nombre, id_tabla, id_sitio, noperaciones, ndesempenio, isCBIR) value ('"
-                                + this.datosBD.getTabla().getNombre() + "_f" + this.nFragmento + "', " + this.datosBD.getTabla().getIdTabla()
+                                + this.sTablaOrigen + "_f" + this.nFragmento + "', " + this.datosBD.getTabla().getIdTabla()
                                 + ", " + idSitio + ",0,0,1)");
                         idFragmento = "" + ((ArrayList) xamanaAcc.ejecutarConsulta("Select LAST_INSERT_ID()").get(0)).get(0);
 
                     } else {
                         xamanaAcc.ejecutarComando("insert into Fragmento(nombre, id_tabla, id_sitio, noperaciones, ndesempenio, isCBIR) value ('"
-                                + this.datosBD.getTabla().getNombre() + "_f" + this.nFragmento + "', " + this.datosBD.getTabla().getIdTabla()
+                                + this.sTablaOrigen + "_f" + this.nFragmento + "', " + this.datosBD.getTabla().getIdTabla()
                                 + ", " + idSitio + "," + this.noperaciones + "," + this.ndesempenio + ",0)");
                         idFragmento = "" + ((ArrayList) xamanaAcc.ejecutarConsulta("Select LAST_INSERT_ID()").get(0)).get(0);
                     }
                     //Modificar atributos en xamana
                     if (!this.isNullorEmpty(idFragmento)) {
                         for (Atributo a : this.getAtts()) {
-                            if(!a.isPk()){
-                                xamanaAcc.ejecutarComando("update Atributo set id_tabla=NULL, id_fragmento=" + idFragmento + " where id_atributo=" + a.getIdAtributo());
+                            if (!a.isPk()) {
+                                String sql = "update Atributo set id_tabla=NULL, id_fragmento=" + idFragmento + " where id_atributo=" + a.getIdAtributo();
+                                System.out.println(sql);
+                                xamanaAcc.ejecutarComando(sql);
+                                System.out.println("Atributo " + a.getNombre() + " actualizado a nuevo fragmento");
                             }
                         }
-                        xamanaAcc.ejecutarComando("insert into Atributo (tipo,size,nom,id_fragmento,descriptor,multimedia,pk,id_tabla) values ('"+
-                                this.getAtts().get(0).getTipo()+"',"+this.getAtts().get(0).getTamanio()+",'"+this.getAtts().get(0).getNombre()+"',"+
-                                idFragmento+",0,0,1,null)");
+                        xamanaAcc.ejecutarComando("insert into Atributo (tipo,size,nom,id_fragmento,descriptor,multimedia,pk,id_tabla) values ('"
+                                + this.datosBD.getTabla().getAtributoLlave().getTipo() + "'," + this.datosBD.getTabla().getAtributoLlave().getTamanio() + ",'" + this.datosBD.getTabla().getAtributoLlave().getNombre() + "',"
+                                + idFragmento + ",0,0,1,null)");
                     }
                     xamanaAcc.desconectar();
                 }
@@ -205,12 +208,19 @@ public class Fragmentador {
                     for (Atributo b : this.getAtts()) {
                         //No eliminar PK
                         if (!b.isPk()) {
-                            accOrigen.ejecutarComando("alter table " + this.datosBD.getTabla().getNombre() + " drop column " + b.getNombre());
+                            accOrigen.ejecutarComando("alter table " + this.sTablaOrigen + " drop column " + b.getNombre());
                             System.out.println(b.getNombre() + ": Atributo eliminado de la tabla original");
                         }
                     }
                     accOrigen.desconectar();
                 }
+                //solicitar actualización de fragmentos en el servidor destino (socket)
+                Socket socket = new Socket(accDestino.ip, 5000);
+                Socket socket2 = new Socket(accOrigen.ip, 5000);
+                new DataOutputStream(socket.getOutputStream()).writeBoolean(true);
+                new DataOutputStream(socket2.getOutputStream()).writeBoolean(true);
+                socket.close();
+                socket2.close();
             }
 
         } catch (Exception e) {
@@ -285,5 +295,30 @@ public class Fragmentador {
 
     public boolean isNullorEmpty(String s) {
         return (s != null) ? ((!s.isEmpty()) ? false : true) : true;
+    }
+
+    //Se elimina origen cuando el fragmento solo posee PK 
+    void eliminarOrigen(String idFragmentoOriginal) {
+        AccesoDatosMy accOrigen = (AccesoDatosMy) this.origen;
+        try {
+            xamanaAcc = new AccesoDatosMy();
+            if (accOrigen.conectar()) {
+                accOrigen.ejecutarComando("drop table " + this.sTablaOrigen);
+                accOrigen.desconectar();
+            }
+            //eliminar el fragmento en xamana
+            if (this.xamanaAcc.conectar()) {
+                xamanaAcc.ejecutarComando("delete from Atributo where id_fragmento=" + idFragmentoOriginal);//solo deberia ser PK
+                xamanaAcc.ejecutarComando("delete from Fragmento where id_fragmento=" + idFragmentoOriginal);
+                xamanaAcc.desconectar();
+            }
+            
+            //Recargar fragmentos en origen
+            Socket socket2 = new Socket(accOrigen.ip, 5000);
+            new DataOutputStream(socket2.getOutputStream()).writeBoolean(true);
+            socket2.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }
