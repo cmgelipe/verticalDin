@@ -148,15 +148,35 @@ public class Vigilante {
                         //¿Es el servidor original?
                         if (this.datosBD.getDirbd().compareTo(miIP) == 0) {
                             //revisar agregado de atributos solo en servidor original
-                            nuevosAtributos();
+                            nuevosAtributosMySQL();
                         } else {
-                            eliminadoAtributos();
+                            eliminadoAtributosMySQL();
                         }
                         logMySQL();
                         Thread.sleep(5000);
                     }
                 } else if (this.datosBD.getTipoBD().compareTo("b") == 0 || this.datosBD.getTipoBD().compareTo("c") == 0) {
                     //POSTGRES
+                    //Abro socket
+                    hilo.start();
+                    while (true) {
+                        if (hilo.banderaRefragmentacion) {
+                            this.datosBD.getTabla().llenaFragmentosxSitio(miIP);
+                            if (this.datosBD.getDirbd().compareTo(miIP) == 0) {
+                                this.datosBD.getTabla().getFragmentos().add(this.datosBD.getTabla().getTablaFragmento());
+                            }
+                            hilo.banderaRefragmentacion = false;
+                        }
+                        //¿Es el servidor original?
+                        if (this.datosBD.getDirbd().compareTo(miIP) == 0) {
+                            //revisar agregado de atributos solo en servidor original
+                            nuevosAtributosPostgreSQL();
+                        } else {
+                            eliminadoAtributosPostgreSQL();
+                        }
+                        logPostgreSQL();
+                        Thread.sleep(5000);
+                    }
                 } else {
                     //MONGO
                 }
@@ -290,7 +310,7 @@ public class Vigilante {
                                     }
                                 }
                             }
-                            
+
                             for (String key : sitioAtributos.keySet()) {
                                 if (!sitioAtributos.get(key).isEmpty()) {
                                     TablaCosto tc = new TablaCosto();
@@ -318,7 +338,7 @@ public class Vigilante {
                                     AccesoDatosMy origen = new AccesoDatosMy(this.miIP + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
                                     AccesoDatosMy destino = new AccesoDatosMy(tc.getSitio() + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
                                     int nFragmento = Integer.parseInt(tc.getNombre().substring(tc.getNombre().lastIndexOf("f") + 1, tc.getNombre().length()));
-                                    Fragmentador fragmentador = new Fragmentador(origen, destino, tc.getArrAtri(), this.datosBD, nFragmento, false, 0, tc.getCosto(),f.getNombre());
+                                    Fragmentador fragmentador = new Fragmentador(origen, destino, tc.getArrAtri(), this.datosBD, nFragmento, false, 0, tc.getCosto(), f.getNombre());
                                     fragmentador.generarFragmentos();
                                     System.out.println(">>>>>>>>>>Generado<<<<<<<<<<<");
                                     //eliminar atributos del modelo despues de fragmentar 
@@ -337,10 +357,10 @@ public class Vigilante {
                                         AccesoDatosMy origen = new AccesoDatosMy(this.miIP + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
                                         AccesoDatosMy destino = new AccesoDatosMy(tc.getSitio() + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
                                         int nFragmento = Integer.parseInt(tc.getNombre().substring(tc.getNombre().lastIndexOf("f") + 1, tc.getNombre().length()));
-                                        Fragmentador fragmentador = new Fragmentador(origen, destino, tc.getArrAtri(), this.datosBD, nFragmento, false, 0, tc.getCosto(),f.getNombre());
+                                        Fragmentador fragmentador = new Fragmentador(origen, destino, tc.getArrAtri(), this.datosBD, nFragmento, false, 0, tc.getCosto(), f.getNombre());
                                         fragmentador.generarFragmentos();
                                         System.out.println(">>>>>>>>>>Generado<<<<<<<<<<<");
-                                        if((f.getAtributos().size()) == tc.getArrAtri().size()){
+                                        if ((f.getAtributos().size()) == tc.getArrAtri().size()) {
                                             //borrar fragmento original (reasignación)
                                             fragmentador.eliminarOrigen(f.getId_fragmento());
                                         }
@@ -488,7 +508,7 @@ public class Vigilante {
     }
 
     // Solo para servidor original (nodos no deben modificar sus atributos directamente)
-    public void nuevosAtributos() {
+    public void nuevosAtributosMySQL() {
         try {
             //Buscar si atributos en tabla original estan registrados en xamana
             AccesoDatosMy accExterno = new AccesoDatosMy(this.datosBD.getDirbd() + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
@@ -576,7 +596,7 @@ public class Vigilante {
                                     Atributo att1 = new Atributo(idAtributo, nombre, att.split(":")[1], att.split(":")[2], (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false, false);
                                     Atributo att2 = new Atributo("" + ((ArrayList) res.get(0)).get(0), "" + ((ArrayList) res.get(0)).get(1), "" + ((ArrayList) res.get(0)).get(2), "" + ((Double) Double.parseDouble("" + ((ArrayList) res.get(0)).get(3))).intValue(), (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false, false);
                                     ArrayList<Atributo> atributos = new ArrayList<>(Arrays.asList(this.datosBD.getTabla().getAtributoLlave(), att1, att2));
-                                    Fragmentador frag = new Fragmentador(accO, accD, atributos, this.datosBD, this.numeroFragmento++, true,this.datosBD.getTabla().getNombre());
+                                    Fragmentador frag = new Fragmentador(accO, accD, atributos, this.datosBD, this.numeroFragmento++, true, this.datosBD.getTabla().getNombre());
                                     frag.generarFragmentos();
                                 }
                             }
@@ -667,7 +687,7 @@ public class Vigilante {
         return att;
     }
 
-    private void eliminadoAtributos() {
+    private void eliminadoAtributosMySQL() {
         try {
             for (Fragmento f : this.datosBD.getTabla().getFragmentos()) {
                 //buscar si atributos en xamana no estan presentes (eliminados) en ESTE NODO (no en el servidor principal)
@@ -726,5 +746,197 @@ public class Vigilante {
             ori.get(i).setNombre(ori.get(i).getNombre() + "_f" + (i + 1));
         }
         return ori;
+    }
+
+    private void nuevosAtributosPostgreSQL() {
+        try {
+            //Buscar si atributos en tabla original estan registrados en xamana
+            AccesoDatosPG accExterno = new AccesoDatosPG(this.datosBD.getDirbd() + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+            ArrayList<String> atts = null;
+            if (accExterno.conectar()) {
+                atts = accExterno.atributos(this.datosBD.getNombd(), this.datosBD.getTabla().getNombre());
+                accExterno.desconectar();
+            }
+            ArrayList<String> nombresAtributosEnXamana = new ArrayList<>();
+            this.datosBD.getTabla().getAtributos().forEach(x -> nombresAtributosEnXamana.add(x.getNombre()));
+            //nombresAtributosEnXamana.forEach(x -> System.out.println("Atributo logico: " + x));
+            if (!this.isNullorEmpty(atts)) {
+                for (String att : atts) {
+                    String nombre = att.split(":")[0];
+                    //System.out.println("Atributo fisico: " + nombre);
+                    if (!nombresAtributosEnXamana.contains(nombre)) {
+                        JRadioButton rbtn1 = new JRadioButton("Descriptor", true);
+                        JRadioButton rbtn2 = new JRadioButton("Multimedia", false);
+                        JRadioButton rbtn3 = new JRadioButton("Ninguna opción anterior", false);
+                        ButtonGroup grupo1 = new ButtonGroup();
+                        grupo1.add(rbtn1);
+                        grupo1.add(rbtn2);
+                        grupo1.add(rbtn3);
+                        String message = "El atributo " + nombre + ", agregado recientemente, es:";
+                        Object[] params = {message, rbtn1, rbtn2, rbtn3};
+                        int n = JOptionPane.showConfirmDialog(null, params, "Tipo de atributo", JOptionPane.DEFAULT_OPTION);
+                        //Si es descriptor o multimedia, revisar si ya se encuentra agregado el otro, para lazar una nueva fragmentación
+                        //y agregar este atributo a la base de datos
+                        //en caso de no ser descriptor o multimedia, agregarlo directamente a la base de datos
+                        if (!rbtn3.isSelected()) {
+                            if (rbtn1.isSelected() || rbtn2.isSelected()) {
+                                //revisar si ya hay un multimedia agregado a xamana en la tabla original
+                                ArrayList res = null;
+                                if (accesoXamana.conectar()) {
+                                    if (rbtn1.isSelected()) {
+                                        res = accesoXamana.ejecutarConsulta("select id_atributo, nom, tipo, size from Atributo where multimedia=1 and id_tabla=" + this.token);
+                                    } else if (rbtn2.isSelected()) {
+                                        res = accesoXamana.ejecutarConsulta("select id_atributo, nom, tipo, size from Atributo where descriptor=1 and id_tabla=" + this.token);
+                                    }
+                                    accesoXamana.desconectar();
+                                }
+                                //registrar atributo en xamana
+                                int t = 0;
+                                String idAtributo = "";
+                                if (this.accesoXamana.conectar()) {
+                                    Atributo nAtt = new Atributo();
+                                    if (rbtn1.isSelected()) {
+                                        nAtt.setNombre(att.split(":")[0]);
+                                        nAtt.setTipo(att.split(":")[1]);
+                                        nAtt.setTamanio(att.split(":")[2]);
+                                        nAtt.setDescriptor(true);
+                                        nAtt.setMultimedia(false);
+                                        nAtt.setPk(false);
+                                        t = this.accesoXamana.ejecutarComando("insert into Atributo (tipo,size,nom,descriptor,multimedia,pk,id_tabla) values ('" + att.split(":")[1] + "'," + att.split(":")[2] + ",'" + att.split(":")[0] + "',1 , 0 ,0," + this.token + ")");
+                                        idAtributo = "" + ((ArrayList) this.accesoXamana.ejecutarConsulta("Select LAST_INSERT_ID()").get(0)).get(0);
+                                    } else if (rbtn2.isSelected()) {
+                                        nAtt.setNombre(att.split(":")[0]);
+                                        nAtt.setTipo(att.split(":")[1]);
+                                        nAtt.setTamanio(att.split(":")[2]);
+                                        nAtt.setDescriptor(false);
+                                        nAtt.setMultimedia(true);
+                                        nAtt.setPk(false);
+                                        t = this.accesoXamana.ejecutarComando("insert into Atributo (tipo,size,nom,descriptor,multimedia,pk,id_tabla) values ('" + att.split(":")[1] + "'," + att.split(":")[2] + ",'" + att.split(":")[0] + "',0 ,1 ,0," + this.token + ")");
+                                        idAtributo = "" + ((ArrayList) this.accesoXamana.ejecutarConsulta("Select LAST_INSERT_ID()").get(0)).get(0);
+                                    }
+                                    if (t == 1 && !this.isNullorEmpty(idAtributo)) {
+                                        nAtt.setIdAtributo(idAtributo);
+                                        this.datosBD.getTabla().getAtributos().add(nAtt);
+                                        this.datosBD.getTabla().getTablaFragmento().getAtributos().add(nAtt);
+                                        System.out.println("Atributo insertado");
+                                    } else {
+                                        System.out.println("Atributo no insertado");
+                                    }
+                                    this.accesoXamana.desconectar();
+                                }
+                                if (!this.isNullorEmpty(res)) {
+                                    //buscar en log que sitio ocupó más estos atributos
+                                    String sitio = buscaSitioXUsoAtributosPostgreSQL(nombre, "" + ((ArrayList) res.get(0)).get(0));
+                                    //origen
+                                    AccesoDatosPG accO = new AccesoDatosPG(this.datosBD.getDirbd() + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+                                    //Destino
+                                    AccesoDatosPG accD = new AccesoDatosPG(sitio + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+                                    //Atributos
+                                    Atributo att1 = new Atributo(idAtributo, nombre, att.split(":")[1], att.split(":")[2], (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false, false);
+                                    Atributo att2 = new Atributo("" + ((ArrayList) res.get(0)).get(0), "" + ((ArrayList) res.get(0)).get(1), "" + ((ArrayList) res.get(0)).get(2), "" + ((Double) Double.parseDouble("" + ((ArrayList) res.get(0)).get(3))).intValue(), (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false, false);
+                                    ArrayList<Atributo> atributos = new ArrayList<>(Arrays.asList(this.datosBD.getTabla().getAtributoLlave(), att1, att2));
+                                    Fragmentador frag = new Fragmentador(accO, accD, atributos, this.datosBD, this.numeroFragmento++, true, this.datosBD.getTabla().getNombre());
+                                    frag.generarFragmentos();
+                                }
+                            }
+                        } else {
+                            //atributo normal, no fragmentar, se debe analizar el log
+                            //registrar atributo en xamana
+                            int t = 0;
+                            String idAtributo = "";
+                            if (this.accesoXamana.conectar()) {
+                                Atributo nAtt = new Atributo();
+                                nAtt.setNombre(att.split(":")[0]);
+                                nAtt.setTipo(att.split(":")[1]);
+                                nAtt.setTamanio(att.split(":")[2]);
+                                nAtt.setDescriptor(false);
+                                nAtt.setMultimedia(false);
+                                nAtt.setPk(false);
+                                t = this.accesoXamana.ejecutarComando("insert into Atributo (tipo,size,nom,descriptor,multimedia,pk,id_tabla) values ('" + att.split(":")[1] + "'," + att.split(":")[2] + ",'" + att.split(":")[0] + "',0 , 0 ,0," + this.token + ")");
+                                idAtributo = "" + ((ArrayList) this.accesoXamana.ejecutarConsulta("Select LAST_INSERT_ID()").get(0)).get(0);
+                                if (t == 1 && !this.isNullorEmpty(idAtributo)) {
+                                    nAtt.setIdAtributo(idAtributo);
+                                    this.datosBD.getTabla().getAtributos().add(nAtt);
+                                    this.datosBD.getTabla().getTablaFragmento().getAtributos().add(nAtt);
+                                    System.out.println("Atributo insertado");
+                                } else {
+                                    System.out.println("Atributo no insertado");
+                                }
+                                this.accesoXamana.desconectar();
+                            }
+                        }
+                    }
+                }
+            } else {
+                System.out.println("Alguien borró los atributos de la tabla recientemente");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void eliminadoAtributosPostgreSQL() {
+        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+    }
+
+    private void logPostgreSQL() {
+        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+    }
+
+    private String buscaSitioXUsoAtributosPostgreSQL(String att1, String att2) {
+        /*
+         Método para buscar en log el sitio que más ocupa atributos CBIR
+         */
+        String IPmasOcupada = "";
+        try {
+            File carpeta = new File(dirLogs);
+            File archivos[] = carpeta.listFiles();
+            HashMap<String, ArrayList> NombreIpUsos = new HashMap<>();
+            for (File item : archivos) {
+                if (item.isFile()) {
+                    RandomAccessFile raf = new RandomAccessFile(item.toString(), "r");
+                    String ip = miIP;
+                    String nombre = "";
+                    while (raf.getFilePointer() < raf.length()) {
+                        String actual = raf.readLine();
+                        if (actual.toLowerCase().contains("conexion autorizada") || actual.toLowerCase().contains("connection authorized")) {
+                            ip = actual.toLowerCase().substring(actual.toLowerCase().indexOf("-_-") + 3, actual.toLowerCase().indexOf("log"));
+                            nombre = actual.substring(actual.indexOf("[") + 1, actual.indexOf("]"));
+                            if (ip.toLowerCase().compareTo("localhost") == 0 || ip.toLowerCase().compareTo("::1") == 0) {
+                                ip = "127.0.0.1";
+                            }
+                            ArrayList IpUso = new ArrayList<>();
+                            IpUso.add(ip);  //IP
+                            if (NombreIpUsos.get(nombre) != null) {
+                                IpUso.add(((Integer) NombreIpUsos.get(nombre).get(1)));
+                            } else {
+                                IpUso.add(new Integer(0));
+                            }
+                            NombreIpUsos.put(nombre, IpUso);
+                        }
+                        if (actual.toLowerCase().contains(att1) || actual.toLowerCase().contains(att2)) {
+                            String y[] = actual.split("\t");
+                            nombre = y[1].substring(0, y[1].indexOf(" "));
+                            NombreIpUsos.get(nombre).set(1, ((Integer) NombreIpUsos.get(nombre).get(1)) + 1);
+                        }
+                    }
+                }
+            }
+            ArrayList valores = new ArrayList<>(NombreIpUsos.values());
+            int aux = 0;
+            for (int p = 0; p < valores.size(); p++) {
+                ArrayList aux2 = (ArrayList) valores.get(p);
+                if (((Integer) aux2.get(1)) > aux) {
+                    aux = (Integer) aux2.get(1);
+                    IPmasOcupada = "" + aux2.get(0);
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        if (IPmasOcupada.isEmpty()) {
+            IPmasOcupada = miIP;
+        }
+        return IPmasOcupada;
     }
 }

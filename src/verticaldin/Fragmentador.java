@@ -157,7 +157,7 @@ public class Fragmentador {
                     }
                     accDestino.desconectar();
                 }
-                
+
                 //Registrar datos en xamana
                 System.out.println("registra en xamana");
                 xamanaAcc = new AccesoDatosMy();
@@ -232,9 +232,125 @@ public class Fragmentador {
         AccesoDatosPG accOrigen = (AccesoDatosPG) this.origen;
         AccesoDatosPG accDestino = (AccesoDatosPG) this.destino;
         try {
+            String att_tipo = "";
+            String att_nombre = "";
+            for (Atributo r : this.getAtts()) {
+                att_nombre += r.getNombre() + ", ";
+                if (this.transTipoDato(r.getTipo()) != 0) {
+                    if (r.isPk()) {
+                        att_tipo += r.getNombre() + " " + r.getTipo() + " PRIMARY KEY, ";
+                    } else {
+                        att_tipo += r.getNombre() + " " + r.getTipo() + ", ";
+                    }
+                } else {
+                    if (r.getTipo().compareTo("BIT") != 0) {
+                        if (r.isPk()) {
+                            att_tipo += r.getNombre() + " " + r.getTipo() + "(" + r.getTamanio() + ") PRIMARY KEY, ";
+                        } else {
+                            att_tipo += r.getNombre() + " " + r.getTipo() + "(" + r.getTamanio() + "), ";
+                        }
+                    } else {
+                        if (r.isPk()) {
+                            att_tipo += r.getNombre() + " TINYINT PRIMARY KEY, ";
+                        } else {
+                            att_tipo += r.getNombre() + " TINYINT, ";
+                        }
+                    }
+                }
+            }
+            att_tipo = att_tipo.substring(0, att_tipo.length() - 2);
+            att_nombre = att_nombre.substring(0, att_nombre.length() - 2);
+            //recuperar datos
+            ArrayList arr = null;
             if (accOrigen.conectar()) {
+                arr = accOrigen.ejecutarConsulta("select " + att_nombre + " from " + this.sTablaOrigen);
                 accOrigen.desconectar();
             }
+            if (!this.isNullorEmpty(arr)) {
+                //Crear nueva tabla
+                if (accDestino.conectar()) {
+                    accDestino.ejecutarComando("create table " + this.sTablaOrigen + "_f" + this.nFragmento + " (" + att_tipo + "));");
+                    //agregar datos
+                    for (int i = 0; i < arr.size(); i++) {
+                        String valores = "";
+                        for (int j = 0; j < ((ArrayList) arr.get(0)).size(); j++) {
+                            if (this.transTipoDato(this.getAtts().get(j).getTipo()) == 0 || this.transTipoDato(this.getAtts().get(j).getTipo()) == 2) {
+                                valores += "'" + ((ArrayList) arr.get(i)).get(j) + "', ";
+                            } else {
+                                valores += ((ArrayList) arr.get(i)).get(j) + ", ";
+                            }
+                        }
+                        valores = valores.substring(0, valores.length() - 2);
+                        String q = "INSERT INTO " + this.sTablaOrigen + "_f" + this.nFragmento + " VALUES (" + valores + ");";
+                        accDestino.ejecutarComando(q);
+                    }
+                    accDestino.desconectar();
+                }
+                //Registrar datos en xamana
+                System.out.println("registra en xamana");
+                xamanaAcc = new AccesoDatosMy();
+                String idFragmento = "";
+                String idSitio = "";
+                if (xamanaAcc.conectar()) {
+                    //id del sitio
+                    ArrayList arr2 = null;
+                    arr2 = xamanaAcc.ejecutarConsulta("select id_sitio from Sitio where direccion='" + accDestino.ip + "'");
+                    if (this.isNullorEmpty(arr2)) {
+                        xamanaAcc.ejecutarComando("insert into Sitio (direccion) values('" + accDestino.ip + "')");
+                        idSitio = "" + ((ArrayList) xamanaAcc.ejecutarConsulta("Select LAST_INSERT_ID()").get(0)).get(0);
+                    } else {
+                        idSitio = "" + ((ArrayList) arr2.get(0)).get(0);
+                    }
+                    if (this.fragmentacionCBIR) {
+                        xamanaAcc.ejecutarComando("insert into Fragmento(nombre, id_tabla, id_sitio, noperaciones, ndesempenio, isCBIR) value ('"
+                                + this.sTablaOrigen + "_f" + this.nFragmento + "', " + this.datosBD.getTabla().getIdTabla()
+                                + ", " + idSitio + ",0,0,1)");
+                        idFragmento = "" + ((ArrayList) xamanaAcc.ejecutarConsulta("Select LAST_INSERT_ID()").get(0)).get(0);
+
+                    } else {
+                        xamanaAcc.ejecutarComando("insert into Fragmento(nombre, id_tabla, id_sitio, noperaciones, ndesempenio, isCBIR) value ('"
+                                + this.sTablaOrigen + "_f" + this.nFragmento + "', " + this.datosBD.getTabla().getIdTabla()
+                                + ", " + idSitio + "," + this.noperaciones + "," + this.ndesempenio + ",0)");
+                        idFragmento = "" + ((ArrayList) xamanaAcc.ejecutarConsulta("Select LAST_INSERT_ID()").get(0)).get(0);
+                    }
+                    //Modificar atributos en xamana
+                    if (!this.isNullorEmpty(idFragmento)) {
+                        for (Atributo a : this.getAtts()) {
+                            if (!a.isPk()) {
+                                String sql = "update Atributo set id_tabla=NULL, id_fragmento=" + idFragmento + " where id_atributo=" + a.getIdAtributo();
+                                System.out.println(sql);
+                                xamanaAcc.ejecutarComando(sql);
+                                System.out.println("Atributo " + a.getNombre() + " actualizado a nuevo fragmento");
+                            }
+                        }
+                        xamanaAcc.ejecutarComando("insert into Atributo (tipo,size,nom,id_fragmento,descriptor,multimedia,pk,id_tabla) values ('"
+                                + this.datosBD.getTabla().getAtributoLlave().getTipo() + "'," + this.datosBD.getTabla().getAtributoLlave().getTamanio() + ",'" + this.datosBD.getTabla().getAtributoLlave().getNombre() + "',"
+                                + idFragmento + ",0,0,1,null)");
+                    }
+                    xamanaAcc.desconectar();
+                }
+
+                //Eliminar atributos en tabla original
+                //Pendiente: primero eliminar relaciones de la tabla (foraneas)
+                if (accOrigen.conectar()) {
+                    for (Atributo b : this.getAtts()) {
+                        //No eliminar PK
+                        if (!b.isPk()) {
+                            accOrigen.ejecutarComando("alter table " + this.sTablaOrigen + " drop column " + b.getNombre());
+                            System.out.println(b.getNombre() + ": Atributo eliminado de la tabla original");
+                        }
+                    }
+                    accOrigen.desconectar();
+                }
+                //solicitar actualización de fragmentos en el servidor destino (socket)
+                Socket socket = new Socket(accDestino.ip, 5000);
+                Socket socket2 = new Socket(accOrigen.ip, 5000);
+                new DataOutputStream(socket.getOutputStream()).writeBoolean(true);
+                new DataOutputStream(socket2.getOutputStream()).writeBoolean(true);
+                socket.close();
+                socket2.close();
+            }
+            
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -312,7 +428,7 @@ public class Fragmentador {
                 xamanaAcc.ejecutarComando("delete from Fragmento where id_fragmento=" + idFragmentoOriginal);
                 xamanaAcc.desconectar();
             }
-            
+
             //Recargar fragmentos en origen
             Socket socket2 = new Socket(accOrigen.ip, 5000);
             new DataOutputStream(socket2.getOutputStream()).writeBoolean(true);

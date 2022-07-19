@@ -20,7 +20,8 @@ import java.util.logging.Logger;
  */
 public final class AccesoDatosPG extends AccesoDatos implements Serializable {
 
-    private static String sUrl = null;  // sUrl de conexión
+    public String sUrl = null;  // sUrl de conexión
+    public String ip = null;
     private static String sUsr = null; // Usuario
     private static String sPwd = null;  // Contraseña
 
