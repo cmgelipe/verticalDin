@@ -414,8 +414,31 @@ public class Fragmentador {
     }
 
     //Se elimina origen cuando el fragmento solo posee PK 
-    void eliminarOrigen(String idFragmentoOriginal) {
+    void eliminarOrigenMySQL(String idFragmentoOriginal) {
         AccesoDatosMy accOrigen = (AccesoDatosMy) this.origen;
+        try {
+            xamanaAcc = new AccesoDatosMy();
+            if (accOrigen.conectar()) {
+                accOrigen.ejecutarComando("drop table " + this.sTablaOrigen);
+                accOrigen.desconectar();
+            }
+            //eliminar el fragmento en xamana
+            if (this.xamanaAcc.conectar()) {
+                xamanaAcc.ejecutarComando("delete from Atributo where id_fragmento=" + idFragmentoOriginal);//solo deberia ser PK
+                xamanaAcc.ejecutarComando("delete from Fragmento where id_fragmento=" + idFragmentoOriginal);
+                xamanaAcc.desconectar();
+            }
+
+            //Recargar fragmentos en origen
+            Socket socket2 = new Socket(accOrigen.ip, 5000);
+            new DataOutputStream(socket2.getOutputStream()).writeBoolean(true);
+            socket2.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    void eliminarOrigenPost(String idFragmentoOriginal) {
+        AccesoDatosPG accOrigen = (AccesoDatosPG) this.origen;
         try {
             xamanaAcc = new AccesoDatosMy();
             if (accOrigen.conectar()) {
