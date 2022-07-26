@@ -245,9 +245,9 @@ public class Fragmentador {
                 } else {
                     if (r.getTipo().compareTo("BIT") != 0) {
                         if (r.isPk()) {
-                            att_tipo += r.getNombre() + " " + r.getTipo() + "(" + r.getTamanio() + ") PRIMARY KEY, ";
+                            att_tipo += r.getNombre() + " " + r.getTipo() + "(" + ((Double)Double.parseDouble(r.getTamanio())).intValue() + ") PRIMARY KEY, ";
                         } else {
-                            att_tipo += r.getNombre() + " " + r.getTipo() + "(" + r.getTamanio() + "), ";
+                            att_tipo += r.getNombre() + " " + r.getTipo() + "(" + ((Double)Double.parseDouble(r.getTamanio())).intValue() + "), ";
                         }
                     } else {
                         if (r.isPk()) {
@@ -269,7 +269,7 @@ public class Fragmentador {
             if (!this.isNullorEmpty(arr)) {
                 //Crear nueva tabla
                 if (accDestino.conectar()) {
-                    accDestino.ejecutarComando("create table " + this.sTablaOrigen + "_f" + this.nFragmento + " (" + att_tipo + "));");
+                    accDestino.ejecutarComando("create table " + this.sTablaOrigen + "_f" + this.nFragmento + " (" + att_tipo + ");");
                     //agregar datos
                     for (int i = 0; i < arr.size(); i++) {
                         String valores = "";
