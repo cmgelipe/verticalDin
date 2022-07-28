@@ -5,6 +5,7 @@
  */
 package verticaldin;
 
+import datos.AccesoDatosMG;
 import modelo.Tabla;
 import modelo.BD;
 import datos.AccesoDatosMy;
@@ -28,6 +29,8 @@ import javax.swing.JRadioButton;
 import modelo.Atributo;
 import modelo.Fragmento;
 import modelo.TablaCosto;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 /**
  *
@@ -179,6 +182,20 @@ public class Vigilante {
                     }
                 } else {
                     //MONGO
+                    //Abro socket
+                    hilo.start();
+                    while (true) {
+                        if (hilo.banderaRefragmentacion) {
+                            this.datosBD.getTabla().llenaFragmentosxSitio(miIP);
+                            if (this.datosBD.getDirbd().compareTo(miIP) == 0) {
+                                this.datosBD.getTabla().getFragmentos().add(this.datosBD.getTabla().getTablaFragmento());
+                            }
+                            hilo.banderaRefragmentacion = false;
+                        }
+                        //No se pueden revisar atributos nuevos, ya que es NoSQL
+                        logMongoDB();
+                        Thread.sleep(5000);
+                    }
                 }
             } else {
                 System.out.println("Ninguna base de datos o tabla para el token dado");
@@ -1167,6 +1184,222 @@ public class Vigilante {
             this.caracterLog = raf.getFilePointer();
 
         } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    private void logMongoDB() {
+        try {
+            File carpeta = new File(dirLogs);
+            File archivos[] = carpeta.listFiles();
+            File ultimoModificado = null;
+            for (int i = 0; i < archivos.length; i++) {
+                if (archivos[i].isFile()) {
+                    if (ultimoModificado == null) {
+                        ultimoModificado = archivos[i];
+                    }
+                    if (archivos[i].lastModified() > ultimoModificado.lastModified()) {
+                        ultimoModificado = archivos[i];
+                    }
+                }
+            }
+            if (ultimoModificado != null) {
+                if (archivoActualLog != null) {
+                    //se debe revisar el ultimo modificado
+                    if (ultimoModificado.length() < this.caracterLog) {
+                        this.caracterLog = 0;
+                    }
+                    if (ultimoModificado.toString() != archivoActualLog) {
+                        archivoActualLog = ultimoModificado.toString();
+                    }
+                    RandomAccessFile raf = new RandomAccessFile(ultimoModificado, "r");
+                    raf.seek(this.caracterLog);
+                    logMongoDBextencion(raf);
+                } else {
+                    for (File archivo : archivos) {
+                        RandomAccessFile raf = new RandomAccessFile(archivo, "r");
+                        logMongoDBextencion(raf);
+                    }
+                    archivoActualLog = ultimoModificado.toString();
+                }
+                //revisar si algun fragmento superó umbrales
+                double costoXFragmento = 0.0;
+                for (Fragmento f : this.datosBD.getTabla().getFragmentos()) {
+                    costoXFragmento = 0.0;
+                    for (Atributo a : f.getAtributos()) {
+                        for (String clave : a.getCostoAtributoxSitio().keySet()) {
+                            costoXFragmento += a.getCostoAtributoxSitio().get(clave);
+                        }
+                    }
+                    System.out.println("Costo de " + f.getNombre() + " es: " + costoXFragmento);
+                    System.out.println("Umbral en " + this.datosBD.getTabla().getUmbralCO());
+                    System.out.println("Desempeño inicial: " + f.getNdesempenio());
+                    System.out.println("Desempeño a alcanzar: " + f.getNdesempenio() * (this.datosBD.getTabla().getUmbralCO() * .01));
+                    if (costoXFragmento >= (f.getNdesempenio() * (this.datosBD.getTabla().getUmbralCO() * .01))) {
+                        //ALCANZÓ UMBRAL
+                        if (!f.isCbir()) {
+                            HashMap<String, ArrayList<Atributo>> sitioAtributos = new HashMap<>();
+                            ArrayList<TablaCosto> nuevoEsquema = new ArrayList<>();
+                            ArrayList<Atributo> attsSinCosto = new ArrayList<>();
+                            for (Atributo a : f.getAtributos()) {
+                                try {
+                                    String ip = this.getMaxEntry(a.getCostoAtributoxSitio()).getKey();
+                                    if (sitioAtributos.containsKey(ip)) {
+                                        //no se deben agregar atributos cbir
+                                        if (!a.isDescriptor() && !a.isMultimedia() && !a.isPk()) {
+                                            sitioAtributos.get(ip).add(a);
+                                        }
+                                    } else {
+                                        ArrayList<Atributo> temp = new ArrayList<>();
+                                        if (!a.isDescriptor() && !a.isMultimedia() && !a.isPk()) {
+                                            temp.add(a);
+                                        }
+                                        sitioAtributos.put(ip, temp);
+                                    }
+                                } catch (Exception e) {
+                                    //e.printStackTrace();
+                                    if (!attsSinCosto.contains(a)) {
+                                        if (!a.isDescriptor() && !a.isMultimedia() && !a.isPk()) {
+                                            attsSinCosto.add(a);
+                                        }
+                                    }
+                                }
+                            }
+
+                            for (String key : sitioAtributos.keySet()) {
+                                if (!sitioAtributos.get(key).isEmpty()) {
+                                    TablaCosto tc = new TablaCosto();
+                                    tc.setNombre(f.getNombre());
+                                    tc.setSitio(key);
+                                    tc.setCosto(costoXFragmento);
+                                    tc.setArrAtri(sitioAtributos.get(key));
+                                    tc.getArrAtri().add(this.datosBD.getTabla().getAtributoLlave());
+                                    nuevoEsquema.add(tc);
+                                }
+                            }
+                            if (attsSinCosto.size() > 0) {
+                                nuevoEsquema.get(0).getArrAtri().addAll(attsSinCosto);
+                            }
+                            nuevoEsquema = this.nombrar(nuevoEsquema);
+                            //si es fragmento que no sea la tabla original
+                            //y la ip a donde se asignará es igual a la ip a donde estoy parado
+                            //y es el único atributo
+                            //no se debe refragmentar,
+                            //si es fragmento de la tabla original, si se debe fragmentar
+                            System.out.println("-------------------------NUEVO ESQUEMA---------------------");
+                            for (TablaCosto tc : nuevoEsquema) {
+                                System.out.println(tc.getNombre() + "\t" + tc.getSitio() + "\t" + tc.getAtributosxComa() + "\t" + tc.getCosto());
+                                if (f.isFragmentoTabla()) {
+                                    AccesoDatosMG origen = new AccesoDatosMG(this.miIP + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), f.getNombre(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+                                    AccesoDatosMG destino = new AccesoDatosMG(tc.getSitio() + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), tc.getNombre(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+                                    int nFragmento = Integer.parseInt(tc.getNombre().substring(tc.getNombre().lastIndexOf("f") + 1, tc.getNombre().length()));
+                                    Fragmentador fragmentador = new Fragmentador(origen, destino, tc.getArrAtri(), this.datosBD, nFragmento, false, 0, tc.getCosto(), f.getNombre());
+                                    fragmentador.generarFragmentos();
+                                    System.out.println(">>>>>>>>>>Generado<<<<<<<<<<<");
+                                    //eliminar atributos del modelo despues de fragmentar 
+                                    for (Atributo a : tc.getArrAtri()) {
+                                        if (!a.isPk()) {
+                                            this.datosBD.getTabla().getAtributos().removeIf(n -> (n.getIdAtributo().compareTo(a.getIdAtributo()) == 0));
+                                            this.datosBD.getTabla().getTablaFragmento().getAtributos().removeIf(n -> (n.getIdAtributo().compareTo(a.getIdAtributo()) == 0));
+                                        }
+                                    }
+                                } else {
+                                    if (tc.getSitio().compareTo(this.miIP) == 0 && (f.getAtributos().size()) <= 2) {
+                                        System.out.println("Alcanzó umbrales, pero no se fragmentará, ya que está en su \nmínima expresión y el sitio destino es el mismo al de origen");
+                                    } else if (tc.getSitio().compareTo(this.miIP) == 0 && (f.getAtributos().size()) == tc.getArrAtri().size()) {
+                                        System.out.println("Alcanzó umbrales, pero no se fragmentará, ya que son los mismos atributos actuales de este fragmento y el sitio destino es el mismo al de origen");
+                                    } else {
+                                        AccesoDatosMG origen = new AccesoDatosMG(this.miIP + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), f.getNombre(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+                                        AccesoDatosMG destino = new AccesoDatosMG(tc.getSitio() + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), tc.getNombre(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+                                        int nFragmento = Integer.parseInt(tc.getNombre().substring(tc.getNombre().lastIndexOf("f") + 1, tc.getNombre().length()));
+                                        Fragmentador fragmentador = new Fragmentador(origen, destino, tc.getArrAtri(), this.datosBD, nFragmento, false, 0, tc.getCosto(), f.getNombre());
+                                        fragmentador.generarFragmentos();
+                                        System.out.println(">>>>>>>>>>Generado<<<<<<<<<<<");
+                                        if ((f.getAtributos().size()) == tc.getArrAtri().size()) {
+                                            //borrar fragmento original (reasignación)
+                                            fragmentador.eliminarOrigenMongo(f.getId_fragmento());
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            System.out.println("No fragmentar, el fragmento es CBIR");
+                        }
+                    }
+                }
+            } else {
+                System.out.println("No hay archivos en la carpeta");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void logMongoDBextencion(RandomAccessFile raf) {
+        try {
+            System.out.println("-----------COSTOS PIPE-------------");
+            while (raf.getFilePointer() < raf.length()) {
+                for (Fragmento f : this.datosBD.getTabla().getFragmentos()) {
+                    f.setNdesempenioLineaLog(0.0);
+                    f.setNoperacionesLineaLog(0.0);
+                }
+                String actual = raf.readLine();
+                String ipLinea = "";
+                if (actual.toLowerCase().contains("command")) {
+                    for (Fragmento f : this.datosBD.getTabla().getFragmentos()) {
+                        System.out.println("Para fragmento: " + f.getNombre());
+                        System.out.println(actual);
+                        if (actual.toLowerCase().contains(f.getNombre().toLowerCase())) {
+                            JSONObject j = new JSONObject(actual);
+                            String c = j.get("c").toString().toLowerCase().trim();
+                            JSONObject j2 = new JSONObject(j.get("attr").toString());
+                            JSONObject j3 = new JSONObject(j2.get("command").toString());
+                            String ns = "";
+                            f.setNdesempenioLineaLog(0);
+                            if (j3.has("find")) {
+                                f.setNdesempenioLineaLog(1);
+                                ns = j3.get("find").toString().toLowerCase();
+                            } else if (j3.has("delete")) {
+                                f.setNdesempenioLineaLog(2);
+                                ns = j3.get("delete").toString().toLowerCase();
+                            } else if (j3.has("insert")) {
+                                f.setNdesempenioLineaLog(2);
+                                ns = j3.get("insert").toString().toLowerCase();
+                            } else if (j3.has("update")) {
+                                f.setNdesempenioLineaLog(3);
+                                ns = j3.get("update").toString().toLowerCase();
+                            }
+                            if (f.getNdesempenioLineaLog() != 0 && c.compareTo("command") == 0 && ns.compareTo(f.getNombre().toLowerCase()) == 0) {
+                                j2 = new JSONObject(j.get("attr").toString());
+                                String remote = j2.get("remote").toString().toLowerCase().trim();
+                                ipLinea = remote.substring(0, remote.indexOf(":"));
+                                NombreIp.put(ipLinea, ipLinea);
+                                System.out.println("SITIO: " + ipLinea);
+                                if (ipLinea.compareTo(this.miIP) != 0) {
+                                    f.setNdesempenioLineaLog(f.getNdesempenioLineaLog() * 2);
+                                }
+                                System.out.println("VAO: " + f.getNdesempenioLineaLog());
+                                int nJoins = incidencias(actual.toLowerCase(), "$lookup");
+                                System.out.println("CR: " + nJoins);
+                                for (int o = 0; o < f.getAtributos().size(); o++) {
+                                    System.out.println("Atributo: " + f.getAtributos().get(o).getNombre().toLowerCase());
+                                    if (actual.toLowerCase().contains(f.getAtributos().get(o).getNombre().toLowerCase()) || !actual.contains("projection")) {
+                                        System.out.println("Tamaño de atributo " + f.getAtributos().get(o).getNombre() + ": " + Double.parseDouble(f.getAtributos().get(o).getTamanio()));
+                                        Double valorActual = 0.0;
+                                        if (f.getAtributos().get(o).getCostoAtributoxSitio().containsKey(ipLinea)) {
+                                            valorActual = f.getAtributos().get(o).getCostoAtributoxSitio().get(ipLinea);
+                                        }
+                                        valorActual += f.getNdesempenioLineaLog() * nJoins * Double.parseDouble(f.getAtributos().get(o).getTamanio());
+                                        f.getAtributos().get(o).getCostoAtributoxSitio().put(ipLinea, valorActual);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            this.caracterLog = raf.getFilePointer();
+        } catch (Exception ex) {
             ex.printStackTrace();
         }
     }

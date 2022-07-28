@@ -25,6 +25,7 @@ import org.json.JSONObject;
 public class AccesoDatosMG extends AccesoDatos implements Serializable {
 
     public String sUrl = null;  // sUrl de conexión
+    public String ip = null;
     public String sUsr = null; // Usuario
     public String sPwd = null;  // Contraseña
     public String tabla = null;

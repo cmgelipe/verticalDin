@@ -5,6 +5,11 @@
  */
 package verticaldin;
 
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.Projections;
+import static com.mongodb.client.model.Updates.unset;
 import datos.AccesoDatos;
 import datos.AccesoDatosMG;
 import datos.AccesoDatosMy;
@@ -12,8 +17,11 @@ import datos.AccesoDatosPG;
 import java.io.DataOutputStream;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.List;
 import modelo.Atributo;
 import modelo.BD;
+import org.bson.Document;
+import org.bson.conversions.Bson;
 
 /**
  *
@@ -245,9 +253,9 @@ public class Fragmentador {
                 } else {
                     if (r.getTipo().compareTo("BIT") != 0) {
                         if (r.isPk()) {
-                            att_tipo += r.getNombre() + " " + r.getTipo() + "(" + ((Double)Double.parseDouble(r.getTamanio())).intValue() + ") PRIMARY KEY, ";
+                            att_tipo += r.getNombre() + " " + r.getTipo() + "(" + ((Double) Double.parseDouble(r.getTamanio())).intValue() + ") PRIMARY KEY, ";
                         } else {
-                            att_tipo += r.getNombre() + " " + r.getTipo() + "(" + ((Double)Double.parseDouble(r.getTamanio())).intValue() + "), ";
+                            att_tipo += r.getNombre() + " " + r.getTipo() + "(" + ((Double) Double.parseDouble(r.getTamanio())).intValue() + "), ";
                         }
                     } else {
                         if (r.isPk()) {
@@ -350,7 +358,7 @@ public class Fragmentador {
                 socket.close();
                 socket2.close();
             }
-            
+
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -360,9 +368,90 @@ public class Fragmentador {
         AccesoDatosMG accOrigen = (AccesoDatosMG) this.origen;
         AccesoDatosMG accDestino = (AccesoDatosMG) this.destino;
         try {
+            if (accOrigen.conectar() && accDestino.conectar()) {
+                //Destino
+                MongoDatabase dbDestino = accDestino.getMongoClient().getDatabase(this.datosBD.getNombd());
+                MongoCollection<Document> docDestino = dbDestino.getCollection(this.sTablaOrigen + "_f" + this.nFragmento);
+                dbDestino.createCollection(this.sTablaOrigen + "_f" + this.nFragmento);
+
+                //Origen
+                MongoDatabase dbOrigen = accOrigen.getMongoClient().getDatabase(this.datosBD.getNombd());
+                MongoCollection<Document> docOrigen = dbOrigen.getCollection(this.sTablaOrigen);
+
+                List<String> nombresAtt = new ArrayList<>();
+                this.atts.forEach(x -> nombresAtt.add(x.getNombre()));
+                Bson proyeccion = Projections.fields(Projections.include(nombresAtt));
+                MongoCursor<Document> resultado = docOrigen.find().projection(proyeccion).iterator();
+                while (resultado.hasNext()) {
+                    docDestino.insertOne(resultado.next());
+                }
+            }
+            //Registrar datos en xamana
+            System.out.println("registra en xamana");
+            xamanaAcc = new AccesoDatosMy();
+            String idFragmento = "";
+            String idSitio = "";
+            if (xamanaAcc.conectar()) {
+                //id del sitio
+                ArrayList arr2 = null;
+                arr2 = xamanaAcc.ejecutarConsulta("select id_sitio from Sitio where direccion='" + accDestino.ip + "'");
+                if (this.isNullorEmpty(arr2)) {
+                    xamanaAcc.ejecutarComando("insert into Sitio (direccion) values('" + accDestino.ip + "')");
+                    idSitio = "" + ((ArrayList) xamanaAcc.ejecutarConsulta("Select LAST_INSERT_ID()").get(0)).get(0);
+                } else {
+                    idSitio = "" + ((ArrayList) arr2.get(0)).get(0);
+                }
+                if (this.fragmentacionCBIR) {
+                    xamanaAcc.ejecutarComando("insert into Fragmento(nombre, id_tabla, id_sitio, noperaciones, ndesempenio, isCBIR) value ('"
+                            + this.sTablaOrigen + "_f" + this.nFragmento + "', " + this.datosBD.getTabla().getIdTabla()
+                            + ", " + idSitio + ",0,0,1)");
+                    idFragmento = "" + ((ArrayList) xamanaAcc.ejecutarConsulta("Select LAST_INSERT_ID()").get(0)).get(0);
+
+                } else {
+                    xamanaAcc.ejecutarComando("insert into Fragmento(nombre, id_tabla, id_sitio, noperaciones, ndesempenio, isCBIR) value ('"
+                            + this.sTablaOrigen + "_f" + this.nFragmento + "', " + this.datosBD.getTabla().getIdTabla()
+                            + ", " + idSitio + "," + this.noperaciones + "," + this.ndesempenio + ",0)");
+                    idFragmento = "" + ((ArrayList) xamanaAcc.ejecutarConsulta("Select LAST_INSERT_ID()").get(0)).get(0);
+                }
+                //Modificar atributos en xamana
+                if (!this.isNullorEmpty(idFragmento)) {
+                    for (Atributo a : this.getAtts()) {
+                        if (!a.isPk()) {
+                            String sql = "update Atributo set id_tabla=NULL, id_fragmento=" + idFragmento + " where id_atributo=" + a.getIdAtributo();
+                            System.out.println(sql);
+                            xamanaAcc.ejecutarComando(sql);
+                            System.out.println("Atributo " + a.getNombre() + " actualizado a nuevo fragmento");
+                        }
+                    }
+                    xamanaAcc.ejecutarComando("insert into Atributo (tipo,size,nom,id_fragmento,descriptor,multimedia,pk,id_tabla) values ('"
+                            + this.datosBD.getTabla().getAtributoLlave().getTipo() + "'," + this.datosBD.getTabla().getAtributoLlave().getTamanio() + ",'" + this.datosBD.getTabla().getAtributoLlave().getNombre() + "',"
+                            + idFragmento + ",0,0,1,null)");
+                }
+                xamanaAcc.desconectar();
+            }
+
+            //Eliminar atributos en tabla original
+            //Pendiente: primero eliminar relaciones de la tabla (foraneas)
             if (accOrigen.conectar()) {
+                MongoDatabase dbOrigen = accOrigen.getMongoClient().getDatabase(this.datosBD.getNombd());
+                MongoCollection<Document> docOrigen = dbOrigen.getCollection(this.sTablaOrigen);
+                for (Atributo b : this.getAtts()) {
+                    //No eliminar PK
+                    if (!b.isPk()) {
+                        docOrigen.updateMany(new Document(), unset(b.getNombre()));
+                        System.out.println(b.getNombre() + ": Atributo eliminado de la tabla original");
+                    }
+                }
                 accOrigen.desconectar();
             }
+            //solicitar actualización de fragmentos en el servidor destino (socket)
+            Socket socket = new Socket(accDestino.ip, 5000);
+            Socket socket2 = new Socket(accOrigen.ip, 5000);
+            new DataOutputStream(socket.getOutputStream()).writeBoolean(true);
+            new DataOutputStream(socket2.getOutputStream()).writeBoolean(true);
+            socket.close();
+            socket2.close();
+
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -437,6 +526,7 @@ public class Fragmentador {
             e.printStackTrace();
         }
     }
+
     void eliminarOrigenPost(String idFragmentoOriginal) {
         AccesoDatosPG accOrigen = (AccesoDatosPG) this.origen;
         try {
@@ -445,6 +535,29 @@ public class Fragmentador {
                 accOrigen.ejecutarComando("drop table " + this.sTablaOrigen);
                 accOrigen.desconectar();
             }
+            //eliminar el fragmento en xamana
+            if (this.xamanaAcc.conectar()) {
+                xamanaAcc.ejecutarComando("delete from Atributo where id_fragmento=" + idFragmentoOriginal);//solo deberia ser PK
+                xamanaAcc.ejecutarComando("delete from Fragmento where id_fragmento=" + idFragmentoOriginal);
+                xamanaAcc.desconectar();
+            }
+
+            //Recargar fragmentos en origen
+            Socket socket2 = new Socket(accOrigen.ip, 5000);
+            new DataOutputStream(socket2.getOutputStream()).writeBoolean(true);
+            socket2.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    void eliminarOrigenMongo(String idFragmentoOriginal) {
+        AccesoDatosMG accOrigen = (AccesoDatosMG) this.origen;
+        try {
+            if (accOrigen.conectar()) {
+                accOrigen.getMongoClient().getDatabase(this.datosBD.getNombd()).getCollection(sTablaOrigen);
+            }
+            xamanaAcc = new AccesoDatosMy();
             //eliminar el fragmento en xamana
             if (this.xamanaAcc.conectar()) {
                 xamanaAcc.ejecutarComando("delete from Atributo where id_fragmento=" + idFragmentoOriginal);//solo deberia ser PK
