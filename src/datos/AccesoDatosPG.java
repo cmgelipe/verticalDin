@@ -29,12 +29,14 @@ public final class AccesoDatosPG extends AccesoDatos implements Serializable {
 
     public AccesoDatosPG() throws Exception {
         //sUrl = "jdbc:postgresql://localhost/hrrb_integral";
+        ip = "127.0.0.1";
         sUrl = "jdbc:postgresql://localhost/version";
         sUsr = "hrrb_ee";
         sPwd = "Password123";
     }
 
     public AccesoDatosPG(String url, String nomdb, String usr, String pwd) throws Exception {
+        ip = url.split(":")[0];
         sUrl = "jdbc:postgresql://" + url + "/" + nomdb;//"jdbc:mysql://localhost/Master";
         sUsr = usr;//"root";
         sPwd = pwd;//"sunny_4teamo";

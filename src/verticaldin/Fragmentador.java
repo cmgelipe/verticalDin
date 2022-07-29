@@ -445,11 +445,13 @@ public class Fragmentador {
                 accOrigen.desconectar();
             }
             //solicitar actualización de fragmentos en el servidor destino (socket)
-            Socket socket = new Socket(accDestino.ip, 5000);
+            //TEMPORAL: COMENTADO DESTINO PORQUE NO ESTA EN EJECUCIÓN VIGILANTE FRAGMENTADOR EN DESTINO (CONNECTION REFUSED)
+            
+            //Socket socket = new Socket(accDestino.ip, 5000);
             Socket socket2 = new Socket(accOrigen.ip, 5000);
-            new DataOutputStream(socket.getOutputStream()).writeBoolean(true);
+            //new DataOutputStream(socket.getOutputStream()).writeBoolean(true);
             new DataOutputStream(socket2.getOutputStream()).writeBoolean(true);
-            socket.close();
+            //socket.close();
             socket2.close();
 
         } catch (Exception e) {
@@ -555,7 +557,7 @@ public class Fragmentador {
         AccesoDatosMG accOrigen = (AccesoDatosMG) this.origen;
         try {
             if (accOrigen.conectar()) {
-                accOrigen.getMongoClient().getDatabase(this.datosBD.getNombd()).getCollection(sTablaOrigen);
+                accOrigen.getMongoClient().getDatabase(this.datosBD.getNombd()).getCollection(sTablaOrigen).drop();
             }
             xamanaAcc = new AccesoDatosMy();
             //eliminar el fragmento en xamana

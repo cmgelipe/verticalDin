@@ -172,6 +172,9 @@ public class Tabla {
 
                         getFragmentos().add(f);
                     }
+                }else{
+                    //No hay fragmentos
+                    setFragmentos(new ArrayList<>());//SE BORRAN ANTERIORES
                 }
                 accesoXamana.desconectar();
             } else {

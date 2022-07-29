@@ -32,6 +32,7 @@ public class AccesoDatosMG extends AccesoDatos implements Serializable {
     private MongoClient mongoClient;  // La conexión
 
     public AccesoDatosMG(String url, String nombd, String tabla, String usr, String pwd) throws Exception {
+        ip = url.split(":")[0];
         sUrl = url;//"jdbc:mysql://localhost/Master";
         sUsr = usr;//"root";
         sPwd = pwd;//"sunny_4teamo";
