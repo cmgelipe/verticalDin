@@ -21,15 +21,13 @@ import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.swing.ButtonGroup;
 import javax.swing.JOptionPane;
 import javax.swing.JRadioButton;
 import modelo.Atributo;
 import modelo.Fragmento;
 import modelo.TablaCosto;
-import org.json.JSONException;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
@@ -47,6 +45,7 @@ public class Vigilante {
     estadoHilo hilo;
     long caracterLog;
     String archivoActualLog;
+    ArrayList<Fragmento> fragmentos = new ArrayList<>();
 
     HashMap<String, String> NombreIp = new HashMap<>();
 
@@ -123,6 +122,7 @@ public class Vigilante {
                 tabla.setAtributos(attTabla);
                 tabla.generaTablaFragmento(); //crear fragmento de la tabla original, para que sea tratado posteriormente como un fragmento más
                 tabla.llenaFragmentosxSitio(miIP);
+                this.fragmentos = tabla.buscaEsquema();
                 this.datosBD.setTabla(tabla);
                 if (this.datosBD.getDirbd().compareTo(miIP) == 0) {
                     this.datosBD.getTabla().getFragmentos().add(this.datosBD.getTabla().getTablaFragmento());
@@ -544,14 +544,14 @@ public class Vigilante {
                     if (!nombresAtributosEnXamana.contains(nombre)) {
                         JRadioButton rbtn1 = new JRadioButton("Descriptor", true);
                         JRadioButton rbtn2 = new JRadioButton("Multimedia", false);
-                        JRadioButton rbtn3 = new JRadioButton("Ninguna opción anterior", false);
+                        JRadioButton rbtn3 = new JRadioButton("None of the above options", false);
                         ButtonGroup grupo1 = new ButtonGroup();
                         grupo1.add(rbtn1);
                         grupo1.add(rbtn2);
                         grupo1.add(rbtn3);
-                        String message = "El atributo " + nombre + ", agregado recientemente, es:";
+                        String message = "The newly added " + nombre + " attribute is:";
                         Object[] params = {message, rbtn1, rbtn2, rbtn3};
-                        int n = JOptionPane.showConfirmDialog(null, params, "Tipo de atributo", JOptionPane.DEFAULT_OPTION);
+                        int n = JOptionPane.showConfirmDialog(null, params, "Attribute type", JOptionPane.DEFAULT_OPTION);
                         //Si es descriptor o multimedia, revisar si ya se encuentra agregado el otro, para lazar una nueva fragmentación
                         //y agregar este atributo a la base de datos
                         //en caso de no ser descriptor o multimedia, agregarlo directamente a la base de datos
@@ -744,7 +744,9 @@ public class Vigilante {
 
     public Map.Entry<String, Double> getMaxEntry(Map<String, Double> map) {
         Map.Entry<String, Double> maxEntry = null;
+        System.out.println("Tamaño del map: "+map.size());
         for (Map.Entry<String, Double> entry : map.entrySet()) {
+            System.out.println("Valor de Entry: "+entry.getValue()+ " Entry: "+entry.getKey());
             if (maxEntry == null) {
                 maxEntry = entry;
             } else {
@@ -754,7 +756,7 @@ public class Vigilante {
                 }
             }
         }
-
+        System.out.println("MAX: "+maxEntry.getValue());
         return maxEntry;
     }
 
@@ -1238,12 +1240,15 @@ public class Vigilante {
                     if (costoXFragmento >= (f.getNdesempenio() * (this.datosBD.getTabla().getUmbralCO() * .01))) {
                         //ALCANZÓ UMBRAL
                         if (!f.isCbir()) {
+                            System.out.println("Este fragmento no es CBIR");
                             HashMap<String, ArrayList<Atributo>> sitioAtributos = new HashMap<>();
                             ArrayList<TablaCosto> nuevoEsquema = new ArrayList<>();
                             ArrayList<Atributo> attsSinCosto = new ArrayList<>();
                             for (Atributo a : f.getAtributos()) {
+                                System.out.println("Atributo "+a.getCostoAtributoxSitio());
                                 try {
                                     String ip = this.getMaxEntry(a.getCostoAtributoxSitio()).getKey();
+                                    System.out.println("Atributo " + a.getNombre() + " se asignará a la " + ip);
                                     if (sitioAtributos.containsKey(ip)) {
                                         //no se deben agregar atributos cbir
                                         if (!a.isDescriptor() && !a.isMultimedia() && !a.isPk()) {
@@ -1257,7 +1262,8 @@ public class Vigilante {
                                         sitioAtributos.put(ip, temp);
                                     }
                                 } catch (Exception e) {
-                                    //e.printStackTrace();
+                                    e.printStackTrace();
+                                    System.out.println("Atributo " + a.getNombre() + " no tiene costo en log");
                                     if (!attsSinCosto.contains(a)) {
                                         if (!a.isDescriptor() && !a.isMultimedia() && !a.isPk()) {
                                             attsSinCosto.add(a);
@@ -1271,10 +1277,19 @@ public class Vigilante {
                                     TablaCosto tc = new TablaCosto();
                                     tc.setNombre(f.getNombre());
                                     tc.setSitio(key);
-                                    tc.setCosto(costoXFragmento);
                                     tc.setArrAtri(sitioAtributos.get(key));
+                                    //determinar el costo de este fragmento nuevo
+                                    Double nuevoCosto=0.0;
+                                    for(Atributo a1:tc.getArrAtri()){
+                                        for (String clave : a1.getCostoAtributoxSitio().keySet()) {
+                                            nuevoCosto += a1.getCostoAtributoxSitio().get(clave);
+                                        }
+                                    }
+                                    tc.setCosto(nuevoCosto);
                                     tc.getArrAtri().add(this.datosBD.getTabla().getAtributoLlave());
                                     nuevoEsquema.add(tc);
+                                } else {
+                                    System.out.println("sitioAtributos esta vacio");
                                 }
                             }
                             if (attsSinCosto.size() > 0) {
@@ -1286,9 +1301,15 @@ public class Vigilante {
                             //y es el único atributo
                             //no se debe refragmentar,
                             //si es fragmento de la tabla original, si se debe fragmentar
-                            System.out.println("-------------------------NUEVO ESQUEMA---------------------");
+                            System.out.println("----------NUEVO ESQUEMA---------");
+                            if(nuevoEsquema.isEmpty()){
+                                System.out.println("VACIO");
+                            }else{
+                                for (TablaCosto tc : nuevoEsquema) {
+                                    System.out.println(tc.getNombre() + "\t" + tc.getSitio() + "\t" + tc.getAtributosxComa() + "\t" + tc.getCosto());
+                                }
+                            }
                             for (TablaCosto tc : nuevoEsquema) {
-                                System.out.println(tc.getNombre() + "\t" + tc.getSitio() + "\t" + tc.getAtributosxComa() + "\t" + tc.getCosto());
                                 if (f.isFragmentoTabla()) {
                                     AccesoDatosMG origen = new AccesoDatosMG(this.miIP + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), f.getNombre(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
                                     AccesoDatosMG destino = new AccesoDatosMG(tc.getSitio() + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), tc.getNombre(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
@@ -1345,62 +1366,169 @@ public class Vigilante {
                 }
                 String actual = raf.readLine();
                 String ipLinea = "";
-                if (actual.toLowerCase().contains("command")) {
-                    for (Fragmento f : this.datosBD.getTabla().getFragmentos()) {
-                        System.out.println("Para fragmento: " + f.getNombre());
-                        System.out.println(actual);
-                        if (actual.toLowerCase().contains(f.getNombre().toLowerCase())) {
-                            JSONObject j = new JSONObject(actual);
-                            String c = j.get("c").toString().toLowerCase().trim();
-                            JSONObject j2 = new JSONObject(j.get("attr").toString());
-                            JSONObject j3 = new JSONObject(j2.get("command").toString());
-                            String ns = "";
-                            f.setNdesempenioLineaLog(0);
-                            if (j3.has("find")) {
-                                f.setNdesempenioLineaLog(1);
-                                ns = j3.get("find").toString().toLowerCase();
-                            } else if (j3.has("delete")) {
-                                f.setNdesempenioLineaLog(2);
-                                ns = j3.get("delete").toString().toLowerCase();
-                            } else if (j3.has("insert")) {
-                                f.setNdesempenioLineaLog(2);
-                                ns = j3.get("insert").toString().toLowerCase();
-                            } else if (j3.has("update")) {
-                                f.setNdesempenioLineaLog(3);
-                                ns = j3.get("update").toString().toLowerCase();
+                if (actual.toLowerCase().contains("command")
+                        && contieneNombreEsquema(actual.toLowerCase())) {
+                    System.out.println(actual);
+                    JSONObject j = new JSONObject(actual);
+                    String c = j.get("c").toString().toLowerCase().trim();
+                    JSONObject j2 = new JSONObject(j.get("attr").toString());
+                    JSONObject j3 = new JSONObject(j2.get("command").toString());
+                    String ns = "";
+                    int desempenio = 0;
+
+                    if (j3.has("find")) {
+                        desempenio = 1;
+                        ns = j3.get("find").toString().toLowerCase();
+                    } else if (j3.has("delete")) {
+                        desempenio = 2;
+                        ns = j3.get("delete").toString().toLowerCase();
+                    } else if (j3.has("insert")) {
+                        desempenio = 2;
+                        ns = j3.get("insert").toString().toLowerCase();
+                    } else if (j3.has("update")) {
+                        desempenio = 3;
+                        ns = j3.get("update").toString().toLowerCase();
+                    }
+                    if (desempenio != 0 && c.compareTo("command") == 0
+                            && contieneNombreEsquema(ns.toLowerCase())) {
+                        j2 = new JSONObject(j.get("attr").toString());
+                        String remote = j2.get("remote").toString().toLowerCase().trim();
+                        ipLinea = remote.substring(0, remote.indexOf(":"));
+                        NombreIp.put(ipLinea, ipLinea);
+                        System.out.println("SITIO: " + ipLinea);
+                        if (ipLinea.compareTo(this.miIP) != 0) {
+                            desempenio = desempenio * 2;
+                        }
+                        System.out.println("VAO: " + desempenio);
+
+                        int nJoins = 0;
+                        ArrayList<String> atributosOpe = buscarAtributos(actual, this.datosBD.getTabla().getAtributos());
+                        ArrayList<Fragmento> fResuelvenAtributos = new ArrayList<>();
+                        for (Fragmento fragmento : this.fragmentos) {
+                            boolean seUsa = false;
+                            for (Atributo l : fragmento.getAtributos()) {
+                                if (atributosOpe.contains(l.getNombre().toLowerCase())) {
+                                    seUsa = true;
+                                }
                             }
-                            if (f.getNdesempenioLineaLog() != 0 && c.compareTo("command") == 0 && ns.compareTo(f.getNombre().toLowerCase()) == 0) {
-                                j2 = new JSONObject(j.get("attr").toString());
-                                String remote = j2.get("remote").toString().toLowerCase().trim();
-                                ipLinea = remote.substring(0, remote.indexOf(":"));
-                                NombreIp.put(ipLinea, ipLinea);
-                                System.out.println("SITIO: " + ipLinea);
-                                if (ipLinea.compareTo(this.miIP) != 0) {
-                                    f.setNdesempenioLineaLog(f.getNdesempenioLineaLog() * 2);
+                            if (seUsa) {
+                                fResuelvenAtributos.add(fragmento);
+                            }
+                        }
+                        nJoins = (fResuelvenAtributos.size() < 1) ? 1 : fResuelvenAtributos.size();
+
+                        boolean siHay = false;
+                        for (Fragmento fragmento : fResuelvenAtributos) {
+                            if (fragmento.getIpFragmento().compareTo(ipLinea) != 0) {
+                                siHay = true;
+                            }
+                        }
+                        if (!siHay) {
+                            desempenio = desempenio * 2;
+                        }
+
+                        System.out.println("CR: " + nJoins);
+                        for (int o = 0; o < this.datosBD.getTabla().getAtributos().size(); o++) {
+                            System.out.println("Atributo: " + this.datosBD.getTabla().getAtributos().get(o).getNombre().toLowerCase());
+                            if (actual.toLowerCase().contains(this.datosBD.getTabla().getAtributos().get(o).getNombre().toLowerCase()) || (!actual.contains("projection") && j3.has("find"))) {
+                                System.out.println("Tamaño de atributo " + this.datosBD.getTabla().getAtributos().get(o).getNombre() + ": " + Double.parseDouble(this.datosBD.getTabla().getAtributos().get(o).getTamanio()));
+                                Double valorActual = 0.0;
+                                if (this.datosBD.getTabla().getAtributos().get(o).getCostoAtributoxSitio().containsKey(ipLinea)) {
+                                    valorActual = this.datosBD.getTabla().getAtributos().get(o).getCostoAtributoxSitio().get(ipLinea);
                                 }
-                                System.out.println("VAO: " + f.getNdesempenioLineaLog());
-                                int nJoins = incidencias(actual.toLowerCase(), "$lookup");
-                                System.out.println("CR: " + nJoins);
-                                for (int o = 0; o < f.getAtributos().size(); o++) {
-                                    System.out.println("Atributo: " + f.getAtributos().get(o).getNombre().toLowerCase());
-                                    if (actual.toLowerCase().contains(f.getAtributos().get(o).getNombre().toLowerCase()) || !actual.contains("projection")) {
-                                        System.out.println("Tamaño de atributo " + f.getAtributos().get(o).getNombre() + ": " + Double.parseDouble(f.getAtributos().get(o).getTamanio()));
-                                        Double valorActual = 0.0;
-                                        if (f.getAtributos().get(o).getCostoAtributoxSitio().containsKey(ipLinea)) {
-                                            valorActual = f.getAtributos().get(o).getCostoAtributoxSitio().get(ipLinea);
-                                        }
-                                        valorActual += f.getNdesempenioLineaLog() * nJoins * Double.parseDouble(f.getAtributos().get(o).getTamanio());
-                                        f.getAtributos().get(o).getCostoAtributoxSitio().put(ipLinea, valorActual);
-                                    }
-                                }
+                                valorActual += desempenio * nJoins * Double.parseDouble(this.datosBD.getTabla().getAtributos().get(o).getTamanio());
+                                this.datosBD.getTabla().getAtributos().get(o).getCostoAtributoxSitio().put(ipLinea, valorActual);
                             }
                         }
                     }
                 }
             }
             this.caracterLog = raf.getFilePointer();
+            for (Fragmento f1 : this.datosBD.getTabla().getFragmentos()) {
+                for (Atributo a1 : f1.getAtributos()) {
+                    for (Atributo a2 : this.datosBD.getTabla().getAtributos()) {
+                        if (a1.getNombre().toLowerCase().compareTo(a2.getNombre().toLowerCase()) == 0) {
+                            a1.setCostoAtributoxSitio(a2.getCostoAtributoxSitio());
+                        }
+                    }
+                }
+            }
         } catch (Exception ex) {
             ex.printStackTrace();
         }
+    }
+
+    private boolean contieneNombreEsquema(String x) {
+        boolean bandera = false;
+        for (Fragmento f : this.fragmentos) {
+            if (x.contains(f.getNombre().toLowerCase())) {
+                bandera = true;
+            }
+        }
+        if (!bandera) {
+            if (x.contains(this.datosBD.getTabla().getNombre().toLowerCase())) {
+                bandera = true;
+            }
+        }
+        return bandera;
+    }
+
+    private ArrayList<String> buscarAtributos(String actual, ArrayList<Atributo> atts) {
+        JSONObject j;
+        ArrayList<String> ret = new ArrayList<>();
+        //QUE ATRIBUTOS SON LOS DEL ESQUEMA?
+        try {
+            j = new JSONObject(actual);
+            String c = j.get("c").toString().toLowerCase().trim();
+            JSONObject j2 = new JSONObject(j.get("attr").toString());
+            JSONObject j3 = new JSONObject(j2.get("command").toString());
+            if (j3.has("find")) {
+                if (j3.has("projection")) {
+                    JSONObject j4 = new JSONObject(j3.get("projection").toString());
+                    for (Atributo a : atts) {
+                        if (j4.has(a.getNombre())) {
+                            ret.add(a.getNombre().toLowerCase());
+                        }
+                    }
+                } else {
+                    for (Atributo a : atts) {
+                        ret.add(a.getNombre().toLowerCase());
+                    }
+                }
+            } else if (j3.has("delete")) {
+                for (Atributo a : atts) {
+                    ret.add(a.getNombre().toLowerCase());
+                }
+            } else if (j3.has("insert")) {
+                //insert many
+                if (j3.has("documents")) {
+                    JSONArray arr = j3.getJSONArray("documents");
+                    for (int i = 0; i < arr.length(); i++) {
+                        for (Atributo a : atts) {
+                            JSONObject j4 = new JSONObject(arr.get(i).toString());
+                            if (j4.has(a.getNombre())) {
+                                if (!ret.contains(a.getNombre())) {
+                                    ret.add(a.getNombre());
+                                }
+                            }
+                        }
+
+                    }
+                }
+            } else if (j3.has("update")) {
+                JSONArray arr = j3.getJSONArray("updates");
+                JSONObject j4 = new JSONObject(arr.get(0).toString());
+                JSONObject j5 = new JSONObject(j4.get("u").toString());
+                JSONObject j6 = new JSONObject(j5.get("$set").toString());
+                for (Atributo a : atts) {
+                    if (j6.has(a.getNombre())) {
+                        ret.add(a.getNombre().toLowerCase());
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        return ret;
     }
 }

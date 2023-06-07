@@ -141,7 +141,7 @@ public class Tabla {
                         + "join Sitio on Sitio.id_sitio=Fragmento.id_sitio where id_tabla=" + this.idTabla + " "
                         + "and direccion='" + ip + "'");
                 if (!isNullorEmpty(res)) {
-                    System.out.println("Fragmentos encontrados");
+                    System.out.println("Fragmentos de sitio encontrados");
                     setFragmentos(new ArrayList<>());
                     for (Object tupla : res) {
                         Fragmento f = new Fragmento();
@@ -172,7 +172,7 @@ public class Tabla {
 
                         getFragmentos().add(f);
                     }
-                }else{
+                } else {
                     //No hay fragmentos
                     setFragmentos(new ArrayList<>());//SE BORRAN ANTERIORES
                 }
@@ -243,7 +243,7 @@ public class Tabla {
 
     public void llenaAtributosTablaFragmento() {
         ArrayList res4 = null;
-        ArrayList<Atributo> arrAtt=new ArrayList<>();
+        ArrayList<Atributo> arrAtt = new ArrayList<>();
         String q = "select id_atributo, tipo, size,nom, descriptor, multimedia, pk from "
                 + "Atributo where id_tabla=" + this.idTabla;
         try {
@@ -251,20 +251,20 @@ public class Tabla {
                 res4 = this.accesoXamana.ejecutarConsulta(q);
                 this.accesoXamana.desconectar();
             }
-            if(!this.isNullorEmpty(res4)){
-                
-                for(int i=0;i<res4.size();i++){
-                    
-                    Atributo att=new Atributo();
-                    att.setIdAtributo(""+((ArrayList)res4.get(i)).get(0));
-                    att.setTipo(""+((ArrayList)res4.get(i)).get(1));
-                    att.setTamanio(""+((ArrayList)res4.get(i)).get(2));
-                    att.setNombre(""+((ArrayList)res4.get(i)).get(3));
+            if (!this.isNullorEmpty(res4)) {
+
+                for (int i = 0; i < res4.size(); i++) {
+
+                    Atributo att = new Atributo();
+                    att.setIdAtributo("" + ((ArrayList) res4.get(i)).get(0));
+                    att.setTipo("" + ((ArrayList) res4.get(i)).get(1));
+                    att.setTamanio("" + ((ArrayList) res4.get(i)).get(2));
+                    att.setNombre("" + ((ArrayList) res4.get(i)).get(3));
                     att.setDescriptor(("" + ((ArrayList) res4.get(i)).get(4)).compareTo("0") != 0);
                     att.setMultimedia(("" + ((ArrayList) res4.get(i)).get(5)).compareTo("0") != 0);
                     att.setPk(false);
                     arrAtt.add(att);
-                    System.out.println("Atributo agregado a fragmentotabla: "+att.getNombre());
+                    System.out.println("Atributo agregado a fragmentotabla: " + att.getNombre());
                 }
                 this.tablaFragmento.setAtributos(atributos);
             }
@@ -285,5 +285,64 @@ public class Tabla {
      */
     public void setNdesempenio(double ndesempenio) {
         this.ndesempenio = ndesempenio;
+    }
+
+    public ArrayList<Fragmento> buscaEsquema() {
+        ArrayList<Fragmento> ret = new ArrayList<>();
+        try {
+            accesoXamana = new AccesoDatosMy();
+            ArrayList res = null;
+            ArrayList res3 = null;
+            if (accesoXamana.conectar()) {
+                //¿Que fragmentos estan en el sitio a donde el vigilante esta?
+                res = accesoXamana.ejecutarConsulta("select id_fragmento, nombre, noperaciones, ndesempenio, isCBIR, Sitio.direccion "
+                        + "from Fragmento "
+                        + "join Sitio on Sitio.id_sitio=Fragmento.id_sitio "
+                        + "where id_tabla=" + this.idTabla);
+                if (!isNullorEmpty(res)) {
+                    System.out.println("Fragmentos de esquema encontrados");
+                    ret = new ArrayList<>();
+                    for (Object tupla : res) {
+                        Fragmento f = new Fragmento();
+                        f.setId_fragmento("" + ((ArrayList) tupla).get(0));
+                        f.setNombre("" + ((ArrayList) tupla).get(1));
+                        f.setNoperaciones(Double.parseDouble("" + ((ArrayList) tupla).get(2)));
+                        f.setNdesempenio(Double.parseDouble("" + ((ArrayList) tupla).get(3)));
+                        f.setCbir(Boolean.parseBoolean("" + ((ArrayList) tupla).get(4)));
+                        f.setIpFragmento("" + ((ArrayList) tupla).get(5));
+                        //buscar atributos de fragmento y agregarlos al fragmento
+                        res3 = accesoXamana.ejecutarConsulta("select id_atributo, tipo, size,nom, descriptor, multimedia, pk "
+                                + "from Atributo "
+                                + "where id_fragmento=" + f.getId_fragmento() + "");
+                        ArrayList<Atributo> attsFragmento = new ArrayList<>();
+                        if (!this.isNullorEmpty(res3)) {
+                            for (int k = 0; k < res3.size(); k++) {
+                                Atributo a = new Atributo();
+                                a.setIdAtributo("" + ((ArrayList) res3.get(k)).get(0));
+                                a.setTipo("" + ((ArrayList) res3.get(k)).get(1));
+                                a.setTamanio("" + ((ArrayList) res3.get(k)).get(2));
+                                a.setNombre("" + ((ArrayList) res3.get(k)).get(3));
+                                a.setDescriptor(("" + ((ArrayList) res3.get(k)).get(4)).compareTo("0") != 0);
+                                a.setMultimedia(("" + ((ArrayList) res3.get(k)).get(5)).compareTo("0") != 0);
+                                a.setPk(("" + ((ArrayList) res3.get(k)).get(6)).compareTo("0") != 0);
+                                attsFragmento.add(a);
+                            }
+                        }
+                        f.setAtributos(attsFragmento);
+                        ret.add(f);
+                    }
+                } else {
+                    //No hay fragmentos
+                    ret = new ArrayList<>();//SE BORRAN ANTERIORES
+                }
+                accesoXamana.desconectar();
+            } else {
+                System.out.println("Sin conexión");
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        return ret;
+
     }
 }

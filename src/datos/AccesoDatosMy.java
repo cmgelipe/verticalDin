@@ -26,8 +26,8 @@ public class AccesoDatosMy extends AccesoDatos implements Serializable {
     private java.sql.Connection oConexion;
 
     public AccesoDatosMy() throws Exception {
-        ip = "127.0.0.1";
-        sUrl = "jdbc:mysql://localhost/xamana?useSSL=false&serverTimezone=UTC";
+        ip = "192.168.100.3";
+        sUrl = "jdbc:mysql://192.168.100.3:3306/xamana?useSSL=false&serverTimezone=UTC";
         sUsr = "root";
         sPwd = "1122";
     }

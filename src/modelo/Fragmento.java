@@ -25,6 +25,7 @@ public class Fragmento {
     private boolean cbir;
     private ArrayList<Atributo> atributos;
     private boolean fragmentoTabla;
+    private String ipFragmento;
 
     /**
      * @return the nombre
@@ -204,6 +205,20 @@ public class Fragmento {
      */
     public void setFragmentoTabla(boolean fragmentoTabla) {
         this.fragmentoTabla = fragmentoTabla;
+    }
+
+    /**
+     * @return the ipFragmento
+     */
+    public String getIpFragmento() {
+        return ipFragmento;
+    }
+
+    /**
+     * @param ipFragmento the ipFragmento to set
+     */
+    public void setIpFragmento(String ipFragmento) {
+        this.ipFragmento = ipFragmento;
     }
 
 }
