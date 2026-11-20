@@ -29,6 +29,7 @@ public class AccesoDatosMG extends AccesoDatos implements Serializable {
     public String sUsr = null; // Usuario
     public String sPwd = null;  // Contraseña
     public String tabla = null;
+    public String nombd = null;
     private MongoClient mongoClient;  // La conexión
 
     public AccesoDatosMG(String url, String nombd, String tabla, String usr, String pwd) throws Exception {
@@ -36,7 +37,16 @@ public class AccesoDatosMG extends AccesoDatos implements Serializable {
         sUrl = url;//"jdbc:mysql://localhost/Master";
         sUsr = usr;//"root";
         sPwd = pwd;//"sunny_4teamo";
+        this.nombd = nombd;
         this.setTabla(tabla);
+    }
+
+    /**
+     * @return la base de datos con la que se construyó esta conexión (la
+     * propia del sitio registrado, no necesariamente la del sitio local)
+     */
+    public String getNombd() {
+        return nombd;
     }
 
     @Override

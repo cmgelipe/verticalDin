@@ -10,6 +10,8 @@ import modelo.Tabla;
 import modelo.BD;
 import datos.AccesoDatosMy;
 import datos.AccesoDatosPG;
+import datos.SitioConexionDAO;
+import modelo.SitioConexion;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -48,6 +50,22 @@ public class Vigilante {
     ArrayList<Fragmento> fragmentos = new ArrayList<>();
 
     HashMap<String, String> NombreIp = new HashMap<>();
+    private final SitioConexionDAO sitioDAO = new SitioConexionDAO();
+
+    /**
+     * Línea de conexión registrada de ese sitio (puerto, base de datos,
+     * usuario, contraseña), consultada en la base de XAMANA con la
+     * conexión que este observer-fragmenter ya tiene hacia ella. Ningún
+     * sitio remoto comparte ya el puerto/usuario/contraseña del sitio
+     * local.
+     */
+    public SitioConexion conexionSitio(String direccion) throws Exception {
+        SitioConexion sitio = sitioDAO.obtenerConexion(direccion);
+        if (sitio == null) {
+            throw new Exception("El sitio " + direccion + " no está registrado en el registro de sitios de XAMANA.");
+        }
+        return sitio;
+    }
 
     public Vigilante(String token, String DirLogs) {
         this.dirLogs = DirLogs;
@@ -352,8 +370,10 @@ public class Vigilante {
                             for (TablaCosto tc : nuevoEsquema) {
                                 System.out.println(tc.getNombre() + "\t" + tc.getSitio() + "\t" + tc.getAtributosxComa() + "\t" + tc.getCosto());
                                 if (f.isFragmentoTabla()) {
-                                    AccesoDatosMy origen = new AccesoDatosMy(this.miIP + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
-                                    AccesoDatosMy destino = new AccesoDatosMy(tc.getSitio() + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+                                    SitioConexion conexionOrigen = conexionSitio(this.miIP);
+                                    SitioConexion conexionDestino = conexionSitio(tc.getSitio());
+                                    AccesoDatosMy origen = new AccesoDatosMy(this.miIP + ":" + conexionOrigen.getPuerto(), conexionOrigen.getBasedatos(), conexionOrigen.getUsuario(), conexionOrigen.getPassword());
+                                    AccesoDatosMy destino = new AccesoDatosMy(tc.getSitio() + ":" + conexionDestino.getPuerto(), conexionDestino.getBasedatos(), conexionDestino.getUsuario(), conexionDestino.getPassword());
                                     int nFragmento = Integer.parseInt(tc.getNombre().substring(tc.getNombre().lastIndexOf("f") + 1, tc.getNombre().length()));
                                     Fragmentador fragmentador = new Fragmentador(origen, destino, tc.getArrAtri(), this.datosBD, nFragmento, false, 0, tc.getCosto(), f.getNombre());
                                     fragmentador.generarFragmentos();
@@ -371,8 +391,10 @@ public class Vigilante {
                                     } else if (tc.getSitio().compareTo(this.miIP) == 0 && (f.getAtributos().size()) == tc.getArrAtri().size()) {
                                         System.out.println("Alcanzó umbrales, pero no se fragmentará, ya que son los mismos atributos actuales de este fragmento y el sitio destino es el mismo al de origen");
                                     } else {
-                                        AccesoDatosMy origen = new AccesoDatosMy(this.miIP + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
-                                        AccesoDatosMy destino = new AccesoDatosMy(tc.getSitio() + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+                                        SitioConexion conexionOrigen = conexionSitio(this.miIP);
+                                        SitioConexion conexionDestino = conexionSitio(tc.getSitio());
+                                        AccesoDatosMy origen = new AccesoDatosMy(this.miIP + ":" + conexionOrigen.getPuerto(), conexionOrigen.getBasedatos(), conexionOrigen.getUsuario(), conexionOrigen.getPassword());
+                                        AccesoDatosMy destino = new AccesoDatosMy(tc.getSitio() + ":" + conexionDestino.getPuerto(), conexionDestino.getBasedatos(), conexionDestino.getUsuario(), conexionDestino.getPassword());
                                         int nFragmento = Integer.parseInt(tc.getNombre().substring(tc.getNombre().lastIndexOf("f") + 1, tc.getNombre().length()));
                                         Fragmentador fragmentador = new Fragmentador(origen, destino, tc.getArrAtri(), this.datosBD, nFragmento, false, 0, tc.getCosto(), f.getNombre());
                                         fragmentador.generarFragmentos();
@@ -528,10 +550,11 @@ public class Vigilante {
     public void nuevosAtributosMySQL() {
         try {
             //Buscar si atributos en tabla original estan registrados en xamana
-            AccesoDatosMy accExterno = new AccesoDatosMy(this.datosBD.getDirbd() + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+            SitioConexion conexionOrigen = conexionSitio(this.datosBD.getDirbd());
+            AccesoDatosMy accExterno = new AccesoDatosMy(this.datosBD.getDirbd() + ":" + conexionOrigen.getPuerto(), conexionOrigen.getBasedatos(), conexionOrigen.getUsuario(), conexionOrigen.getPassword());
             ArrayList<String> atts = null;
             if (accExterno.conectar()) {
-                atts = accExterno.atributos(this.datosBD.getNombd(), this.datosBD.getTabla().getNombre());
+                atts = accExterno.atributos(conexionOrigen.getBasedatos(), this.datosBD.getTabla().getNombre());
                 accExterno.desconectar();
             }
             ArrayList<String> nombresAtributosEnXamana = new ArrayList<>();
@@ -606,9 +629,10 @@ public class Vigilante {
                                     //buscar en log que sitio ocupó más estos atributos
                                     String sitio = buscaSitioXUsoAtributosMYSQL(nombre, "" + ((ArrayList) res.get(0)).get(0));
                                     //origen
-                                    AccesoDatosMy accO = new AccesoDatosMy(this.datosBD.getDirbd() + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+                                    AccesoDatosMy accO = new AccesoDatosMy(this.datosBD.getDirbd() + ":" + conexionOrigen.getPuerto(), conexionOrigen.getBasedatos(), conexionOrigen.getUsuario(), conexionOrigen.getPassword());
                                     //Destino
-                                    AccesoDatosMy accD = new AccesoDatosMy(sitio + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+                                    SitioConexion conexionDestino = conexionSitio(sitio);
+                                    AccesoDatosMy accD = new AccesoDatosMy(sitio + ":" + conexionDestino.getPuerto(), conexionDestino.getBasedatos(), conexionDestino.getUsuario(), conexionDestino.getPassword());
                                     //Atributos
                                     Atributo att1 = new Atributo(idAtributo, nombre, att.split(":")[1], att.split(":")[2], (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false, false);
                                     Atributo att2 = new Atributo("" + ((ArrayList) res.get(0)).get(0), "" + ((ArrayList) res.get(0)).get(1), "" + ((ArrayList) res.get(0)).get(2), "" + ((Double) Double.parseDouble("" + ((ArrayList) res.get(0)).get(3))).intValue(), (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false, false);
@@ -708,10 +732,11 @@ public class Vigilante {
         try {
             for (Fragmento f : this.datosBD.getTabla().getFragmentos()) {
                 //buscar si atributos en xamana no estan presentes (eliminados) en ESTE NODO (no en el servidor principal)
-                AccesoDatosMy accExterno = new AccesoDatosMy(this.datosBD.getDirbd() + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+                SitioConexion conexionOrigen = conexionSitio(this.datosBD.getDirbd());
+                AccesoDatosMy accExterno = new AccesoDatosMy(this.datosBD.getDirbd() + ":" + conexionOrigen.getPuerto(), conexionOrigen.getBasedatos(), conexionOrigen.getUsuario(), conexionOrigen.getPassword());
                 ArrayList<String> atributosEnFragmento = new ArrayList<String>();
                 if (accExterno.conectar()) {
-                    atributosEnFragmento = accExterno.atributos(this.datosBD.getNombd(), f.getNombre());
+                    atributosEnFragmento = accExterno.atributos(conexionOrigen.getBasedatos(), f.getNombre());
                     accExterno.desconectar();
                 }
                 if (!this.isNullorEmpty(atributosEnFragmento)) {
@@ -770,10 +795,11 @@ public class Vigilante {
     private void nuevosAtributosPostgreSQL() {
         try {
             //Buscar si atributos en tabla original estan registrados en xamana
-            AccesoDatosPG accExterno = new AccesoDatosPG(this.datosBD.getDirbd() + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+            SitioConexion conexionOrigen = conexionSitio(this.datosBD.getDirbd());
+            AccesoDatosPG accExterno = new AccesoDatosPG(this.datosBD.getDirbd() + ":" + conexionOrigen.getPuerto(), conexionOrigen.getBasedatos(), conexionOrigen.getUsuario(), conexionOrigen.getPassword());
             ArrayList<String> atts = null;
             if (accExterno.conectar()) {
-                atts = accExterno.atributos(this.datosBD.getNombd(), this.datosBD.getTabla().getNombre());
+                atts = accExterno.atributos(conexionOrigen.getBasedatos(), this.datosBD.getTabla().getNombre());
                 accExterno.desconectar();
             }
             ArrayList<String> nombresAtributosEnXamana = new ArrayList<>();
@@ -847,9 +873,10 @@ public class Vigilante {
                                     //buscar en log que sitio ocupó más estos atributos
                                     String sitio = buscaSitioXUsoAtributosPostgreSQL(nombre, "" + ((ArrayList) res.get(0)).get(0));
                                     //origen
-                                    AccesoDatosPG accO = new AccesoDatosPG(this.datosBD.getDirbd() + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+                                    AccesoDatosPG accO = new AccesoDatosPG(this.datosBD.getDirbd() + ":" + conexionOrigen.getPuerto(), conexionOrigen.getBasedatos(), conexionOrigen.getUsuario(), conexionOrigen.getPassword());
                                     //Destino
-                                    AccesoDatosPG accD = new AccesoDatosPG(sitio + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+                                    SitioConexion conexionDestino = conexionSitio(sitio);
+                                    AccesoDatosPG accD = new AccesoDatosPG(sitio + ":" + conexionDestino.getPuerto(), conexionDestino.getBasedatos(), conexionDestino.getUsuario(), conexionDestino.getPassword());
                                     //Atributos
                                     Atributo att1 = new Atributo(idAtributo, nombre, att.split(":")[1], att.split(":")[2], (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false, false);
                                     Atributo att2 = new Atributo("" + ((ArrayList) res.get(0)).get(0), "" + ((ArrayList) res.get(0)).get(1), "" + ((ArrayList) res.get(0)).get(2), "" + ((Double) Double.parseDouble("" + ((ArrayList) res.get(0)).get(3))).intValue(), (rbtn1.isSelected()) ? true : false, (rbtn2.isSelected()) ? true : false, false);
@@ -898,10 +925,11 @@ public class Vigilante {
         try {
             for (Fragmento f : this.datosBD.getTabla().getFragmentos()) {
                 //buscar si atributos en xamana no estan presentes (eliminados) en ESTE NODO (no en el servidor principal)
-                AccesoDatosPG accExterno = new AccesoDatosPG(this.datosBD.getDirbd() + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+                SitioConexion conexionOrigen = conexionSitio(this.datosBD.getDirbd());
+                AccesoDatosPG accExterno = new AccesoDatosPG(this.datosBD.getDirbd() + ":" + conexionOrigen.getPuerto(), conexionOrigen.getBasedatos(), conexionOrigen.getUsuario(), conexionOrigen.getPassword());
                 ArrayList<String> atributosEnFragmento = new ArrayList<String>();
                 if (accExterno.conectar()) {
-                    atributosEnFragmento = accExterno.atributos(this.datosBD.getNombd(), f.getNombre());
+                    atributosEnFragmento = accExterno.atributos(conexionOrigen.getBasedatos(), f.getNombre());
                     accExterno.desconectar();
                 }
                 if (!this.isNullorEmpty(atributosEnFragmento)) {
@@ -1024,8 +1052,10 @@ public class Vigilante {
                             for (TablaCosto tc : nuevoEsquema) {
                                 System.out.println(tc.getNombre() + "\t" + tc.getSitio() + "\t" + tc.getAtributosxComa() + "\t" + tc.getCosto());
                                 if (f.isFragmentoTabla()) {
-                                    AccesoDatosPG origen = new AccesoDatosPG(this.miIP + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
-                                    AccesoDatosPG destino = new AccesoDatosPG(tc.getSitio() + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+                                    SitioConexion conexionOrigen = conexionSitio(this.miIP);
+                                    SitioConexion conexionDestino = conexionSitio(tc.getSitio());
+                                    AccesoDatosPG origen = new AccesoDatosPG(this.miIP + ":" + conexionOrigen.getPuerto(), conexionOrigen.getBasedatos(), conexionOrigen.getUsuario(), conexionOrigen.getPassword());
+                                    AccesoDatosPG destino = new AccesoDatosPG(tc.getSitio() + ":" + conexionDestino.getPuerto(), conexionDestino.getBasedatos(), conexionDestino.getUsuario(), conexionDestino.getPassword());
                                     int nFragmento = Integer.parseInt(tc.getNombre().substring(tc.getNombre().lastIndexOf("f") + 1, tc.getNombre().length()));
                                     Fragmentador fragmentador = new Fragmentador(origen, destino, tc.getArrAtri(), this.datosBD, nFragmento, false, 0, tc.getCosto(), f.getNombre());
                                     fragmentador.generarFragmentos();
@@ -1043,8 +1073,10 @@ public class Vigilante {
                                     } else if (tc.getSitio().compareTo(this.miIP) == 0 && (f.getAtributos().size()) == tc.getArrAtri().size()) {
                                         System.out.println("Alcanzó umbrales, pero no se fragmentará, ya que son los mismos atributos actuales de este fragmento y el sitio destino es el mismo al de origen");
                                     } else {
-                                        AccesoDatosPG origen = new AccesoDatosPG(this.miIP + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
-                                        AccesoDatosPG destino = new AccesoDatosPG(tc.getSitio() + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+                                        SitioConexion conexionOrigen = conexionSitio(this.miIP);
+                                        SitioConexion conexionDestino = conexionSitio(tc.getSitio());
+                                        AccesoDatosPG origen = new AccesoDatosPG(this.miIP + ":" + conexionOrigen.getPuerto(), conexionOrigen.getBasedatos(), conexionOrigen.getUsuario(), conexionOrigen.getPassword());
+                                        AccesoDatosPG destino = new AccesoDatosPG(tc.getSitio() + ":" + conexionDestino.getPuerto(), conexionDestino.getBasedatos(), conexionDestino.getUsuario(), conexionDestino.getPassword());
                                         int nFragmento = Integer.parseInt(tc.getNombre().substring(tc.getNombre().lastIndexOf("f") + 1, tc.getNombre().length()));
                                         Fragmentador fragmentador = new Fragmentador(origen, destino, tc.getArrAtri(), this.datosBD, nFragmento, false, 0, tc.getCosto(), f.getNombre());
                                         fragmentador.generarFragmentos();
@@ -1311,8 +1343,10 @@ public class Vigilante {
                             }
                             for (TablaCosto tc : nuevoEsquema) {
                                 if (f.isFragmentoTabla()) {
-                                    AccesoDatosMG origen = new AccesoDatosMG(this.miIP + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), f.getNombre(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
-                                    AccesoDatosMG destino = new AccesoDatosMG(tc.getSitio() + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), tc.getNombre(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+                                    SitioConexion conexionOrigen = conexionSitio(this.miIP);
+                                    SitioConexion conexionDestino = conexionSitio(tc.getSitio());
+                                    AccesoDatosMG origen = new AccesoDatosMG(this.miIP + ":" + conexionOrigen.getPuerto(), conexionOrigen.getBasedatos(), f.getNombre(), conexionOrigen.getUsuario(), conexionOrigen.getPassword());
+                                    AccesoDatosMG destino = new AccesoDatosMG(tc.getSitio() + ":" + conexionDestino.getPuerto(), conexionDestino.getBasedatos(), tc.getNombre(), conexionDestino.getUsuario(), conexionDestino.getPassword());
                                     int nFragmento = Integer.parseInt(tc.getNombre().substring(tc.getNombre().lastIndexOf("f") + 1, tc.getNombre().length()));
                                     Fragmentador fragmentador = new Fragmentador(origen, destino, tc.getArrAtri(), this.datosBD, nFragmento, false, 0, tc.getCosto(), f.getNombre());
                                     fragmentador.generarFragmentos();
@@ -1330,8 +1364,10 @@ public class Vigilante {
                                     } else if (tc.getSitio().compareTo(this.miIP) == 0 && (f.getAtributos().size()) == tc.getArrAtri().size()) {
                                         System.out.println("Alcanzó umbrales, pero no se fragmentará, ya que son los mismos atributos actuales de este fragmento y el sitio destino es el mismo al de origen");
                                     } else {
-                                        AccesoDatosMG origen = new AccesoDatosMG(this.miIP + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), f.getNombre(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
-                                        AccesoDatosMG destino = new AccesoDatosMG(tc.getSitio() + ":" + this.datosBD.getPortbd(), this.datosBD.getNombd(), tc.getNombre(), this.datosBD.getUsubd(), this.datosBD.getPassbd());
+                                        SitioConexion conexionOrigen = conexionSitio(this.miIP);
+                                        SitioConexion conexionDestino = conexionSitio(tc.getSitio());
+                                        AccesoDatosMG origen = new AccesoDatosMG(this.miIP + ":" + conexionOrigen.getPuerto(), conexionOrigen.getBasedatos(), f.getNombre(), conexionOrigen.getUsuario(), conexionOrigen.getPassword());
+                                        AccesoDatosMG destino = new AccesoDatosMG(tc.getSitio() + ":" + conexionDestino.getPuerto(), conexionDestino.getBasedatos(), tc.getNombre(), conexionDestino.getUsuario(), conexionDestino.getPassword());
                                         int nFragmento = Integer.parseInt(tc.getNombre().substring(tc.getNombre().lastIndexOf("f") + 1, tc.getNombre().length()));
                                         Fragmentador fragmentador = new Fragmentador(origen, destino, tc.getArrAtri(), this.datosBD, nFragmento, false, 0, tc.getCosto(), f.getNombre());
                                         fragmentador.generarFragmentos();

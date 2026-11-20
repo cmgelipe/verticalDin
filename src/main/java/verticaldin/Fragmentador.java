@@ -370,12 +370,12 @@ public class Fragmentador {
         try {
             if (accOrigen.conectar() && accDestino.conectar()) {
                 //Destino
-                MongoDatabase dbDestino = accDestino.getMongoClient().getDatabase(this.datosBD.getNombd());
+                MongoDatabase dbDestino = accDestino.getMongoClient().getDatabase(accDestino.getNombd());
                 MongoCollection<Document> docDestino = dbDestino.getCollection(this.sTablaOrigen + "_f" + this.nFragmento);
                 dbDestino.createCollection(this.sTablaOrigen + "_f" + this.nFragmento);
 
                 //Origen
-                MongoDatabase dbOrigen = accOrigen.getMongoClient().getDatabase(this.datosBD.getNombd());
+                MongoDatabase dbOrigen = accOrigen.getMongoClient().getDatabase(accOrigen.getNombd());
                 MongoCollection<Document> docOrigen = dbOrigen.getCollection(this.sTablaOrigen);
 
                 List<String> nombresAtt = new ArrayList<>();
@@ -433,7 +433,7 @@ public class Fragmentador {
             //Eliminar atributos en tabla original
             //Pendiente: primero eliminar relaciones de la tabla (foraneas)
             if (accOrigen.conectar()) {
-                MongoDatabase dbOrigen = accOrigen.getMongoClient().getDatabase(this.datosBD.getNombd());
+                MongoDatabase dbOrigen = accOrigen.getMongoClient().getDatabase(accOrigen.getNombd());
                 MongoCollection<Document> docOrigen = dbOrigen.getCollection(this.sTablaOrigen);
                 for (Atributo b : this.getAtts()) {
                     //No eliminar PK
@@ -557,7 +557,7 @@ public class Fragmentador {
         AccesoDatosMG accOrigen = (AccesoDatosMG) this.origen;
         try {
             if (accOrigen.conectar()) {
-                accOrigen.getMongoClient().getDatabase(this.datosBD.getNombd()).getCollection(sTablaOrigen).drop();
+                accOrigen.getMongoClient().getDatabase(accOrigen.getNombd()).getCollection(sTablaOrigen).drop();
             }
             xamanaAcc = new AccesoDatosMy();
             //eliminar el fragmento en xamana

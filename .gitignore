@@ -1,2 +1,3 @@
-/dist/
-/build/
+/target/
+/nbproject/private/
+/nb-configuration.xml

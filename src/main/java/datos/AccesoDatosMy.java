@@ -4,6 +4,7 @@ import java.io.Serializable;
 import java.sql.DatabaseMetaData;
 import java.sql.Date;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
@@ -107,6 +108,30 @@ public class AccesoDatosMy extends AccesoDatos implements Serializable {
         ret = ejecutarComando(vTransaction);
 
         return ret;
+    }
+
+    public synchronized ArrayList ejecutarConsultaParam(String psQuery, Object... params) throws Exception {
+        PreparedStatement pstmt = null;
+        ResultSet rset = null;
+        ArrayList vrset = null;
+        ResultSetMetaData rsmd = null;
+        try {
+            pstmt = oConexion.prepareStatement(psQuery);
+            for (int i = 0; i < params.length; i++) {
+                pstmt.setObject(i + 1, params[i]);
+            }
+            rset = pstmt.executeQuery();
+            rsmd = rset.getMetaData();
+            vrset = convierteALista(rset, rsmd, rsmd.getColumnCount());
+        } finally {
+            if (rset != null) {
+                rset.close();
+            }
+            if (pstmt != null) {
+                pstmt.close();
+            }
+        }
+        return vrset;
     }
 
     protected synchronized int ejecutarComando(ArrayList pvStatement)
